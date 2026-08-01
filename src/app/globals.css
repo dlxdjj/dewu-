@@ -1,0 +1,32 @@
+@import "tailwindcss";
+
+/* ===== 设计变量：苹果简约风格（无渐变、无发光） ===== */
+@theme {
+  --color-background: #f2f2f7; /* 页面浅灰底 */
+  --color-card: #ffffff; /* 白色卡片 */
+  --color-label: #1c1c1e; /* 主文字 */
+  --color-muted: #8e8e93; /* 次要文字 */
+  --color-tint: #0a84ff; /* 系统蓝（与 App 图标一致） */
+  --color-separator: #e5e5ea; /* 细分隔线 */
+
+  --font-sans:
+    -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue",
+    "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+}
+
+html {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  -webkit-tap-highlight-color: transparent;
+}
+
+body {
+  background: var(--color-background);
+  color: var(--color-label);
+  font-family: var(--font-sans);
+}
+
+/* iOS 底部安全区 */
+.pb-safe {
+  padding-bottom: env(safe-area-inset-bottom);
+}
