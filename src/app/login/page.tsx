@@ -1,15 +1,17 @@
 "use client";
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { signInWithPassword } from "@/lib/supabase/auth";
 
 export default function LoginPage() {
+  const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState(false);
   async function submit() {
     setBusy(true); setMessage("");
-    try { await signInWithPassword(email, password); location.assign("/"); }
+    try { await signInWithPassword(email, password); router.replace("/"); }
     catch (error) { setMessage(error instanceof Error ? error.message : "登录失败"); }
     finally { setBusy(false); }
   }
