@@ -8,6 +8,7 @@ import {
   PlusCircleIcon,
   ChartIcon,
 } from "@/components/ui/icons";
+import { toAppPathname } from "@/lib/base-path";
 
 const tabs = [
   { href: "/", label: "首页", Icon: HouseIcon },
@@ -18,7 +19,7 @@ const tabs = [
 ] as const;
 
 export default function BottomNav() {
-  const pathname = usePathname();
+  const pathname = toAppPathname(usePathname());
 
   return (
     <nav className="fixed inset-x-0 bottom-0 z-50 border-t border-separator bg-card/90 backdrop-blur">

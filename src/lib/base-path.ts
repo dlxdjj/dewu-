@@ -22,3 +22,24 @@ export function withBasePath(
 
   return `${normalizedBasePath}${normalizedPath}`;
 }
+
+export function toAppPathname(
+  pathname: string,
+  basePath = appBasePath,
+): string {
+  const normalizedBasePath = normalizeBasePath(basePath);
+  let appPathname = pathname || "/";
+
+  if (
+    normalizedBasePath &&
+    (appPathname === normalizedBasePath ||
+      appPathname.startsWith(`${normalizedBasePath}/`))
+  ) {
+    appPathname = appPathname.slice(normalizedBasePath.length) || "/";
+  }
+
+  if (!appPathname.startsWith("/")) appPathname = `/${appPathname}`;
+  if (appPathname.length > 1) appPathname = appPathname.replace(/\/+$/, "");
+
+  return appPathname || "/";
+}

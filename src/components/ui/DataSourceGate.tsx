@@ -10,6 +10,7 @@ import {
   onAuthSessionChange,
 } from "@/lib/supabase/auth";
 import { isSupabaseConfigured } from "@/lib/supabase/client";
+import { toAppPathname } from "@/lib/base-path";
 
 export interface GateDependencies {
   completeAuthCallback: () => Promise<Session | null>;
@@ -35,7 +36,7 @@ export interface GateNavigation {
 }
 
 function useDefaultNavigation(): GateNavigation {
-  const pathname = usePathname();
+  const pathname = toAppPathname(usePathname());
   const router = useRouter();
   return { pathname, replace: router.replace };
 }

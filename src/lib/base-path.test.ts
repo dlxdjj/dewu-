@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { normalizeBasePath, withBasePath } from "./base-path";
+import { normalizeBasePath, toAppPathname, withBasePath } from "./base-path";
 
 describe("GitHub Pages base path", () => {
   it("keeps local development at the domain root", () => {
@@ -19,5 +19,12 @@ describe("GitHub Pages base path", () => {
     expect(withBasePath("icons/icon-192.png", "/dewu-/")).toBe(
       "/dewu-/icons/icon-192.png",
     );
+  });
+
+  it("converts browser pathnames back to logical application routes", () => {
+    expect(toAppPathname("/dewu-/login", "/dewu-")).toBe("/login");
+    expect(toAppPathname("/dewu-/login/", "/dewu-")).toBe("/login");
+    expect(toAppPathname("/dewu-/", "/dewu-")).toBe("/");
+    expect(toAppPathname("/login", "/dewu-")).toBe("/login");
   });
 });
