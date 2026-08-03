@@ -1,9 +1,121 @@
-import type { InventoryUnit,Product,PurchaseBatch,Sale } from "@/lib/types/database";
-import { actualProfitCents,daysSinceCreated,profitMargin } from "@/lib/utils/profit";
-import { ACTIVE_STATUSES } from "@/lib/constants/status";
-import { PLATFORM_LABELS,type Platform } from "@/lib/constants/platform";
-export type ReportBasis="settled"|"sold";
-export interface ReportRow{unit:InventoryUnit;sale:Sale;product:Product;batch:PurchaseBatch;profit:number;}
-export interface MonthlyReport{totalPayout:number;actualProfitTotal:number;soldCount:number;settledCount:number;avgMargin:number|null;activeStockCost:number;daily:{day:number;profit:number}[];platformRanking:{platform:Platform;label:string;profit:number;count:number}[];topProducts:{name:string;profit:number}[];losingProducts:{name:string;profit:number}[];longestStaying:{id:string;name:string;days:number}[];rows:ReportRow[];}
-export function buildMonthlyReport({units,products,batches,sales,month,basis}:{units:InventoryUnit[];products:Product[];batches:PurchaseBatch[];sales:Sale[];month:string;basis:ReportBasis;}):MonthlyReport{const validUnits=units.filter((u)=>u.status!=="refunded");const unitMap=new Map(validUnits.map((u)=>[u.id,u]));const productsMap=new Map(products.map((p)=>[p.id,p]));const batchMap=new Map(batches.map((b)=>[b.id,b]));const rows:ReportRow[]=[];for(const sale of sales){const date=basis==="settled"?sale.settled_at:sale.sold_at;if(!date?.startsWith(month))continue;const unit=unitMap.get(sale.unit_id);if(!unit)continue;const product=productsMap.get(unit.product_id);const batch=batchMap.get(unit.batch_id);const profit=actualProfitCents(unit.unit_cost_cents,unit.outbound_shipping_cents,sale.actual_payout_cents);if(!product||!batch||profit==null)continue;rows.push({unit,sale,product,batch,profit});}const totalPayout=rows.reduce((sum,row)=>sum+(row.sale.actual_payout_cents??0),0);const actualProfitTotal=rows.reduce((sum,row)=>sum+row.profit,0);const margins=rows.map((row)=>profitMargin(row.profit,row.unit.unit_cost_cents)).filter((value):value is number=>value!=null);const dailyMap=new Map<number,number>();const platformMap=new Map<Platform,{profit:number;count:number}>();const productMap=new Map<string,number>();for(const row of rows){const date=basis==="settled"?row.sale.settled_at:row.sale.sold_at;const day=Number(date?.slice(8,10));dailyMap.set(day,(dailyMap.get(day)??0)+row.profit);const platform=platformMap.get(row.batch.platform)??{profit:0,count:0};platform.profit+=row.profit;platform.count+=1;platformMap.set(row.batch.platform,platform);productMap.set(row.product.name,(productMap.get(row.product.name)??0)+row.profit);}const productEntries=[...productMap].map(([name,profit])=>({name,profit}));return{totalPayout,actualProfitTotal,soldCount:sales.filter((sale)=>sale.sold_at?.startsWith(month)&&unitMap.has(sale.unit_id)).length,settledCount:sales.filter((sale)=>sale.settled_at?.startsWith(month)&&unitMap.has(sale.unit_id)).length,avgMargin:margins.length?margins.reduce((a,b)=>a+b,0)/margins.length:null,activeStockCost:validUnits.filter((u)=>ACTIVE_STATUSES.includes(u.status)).reduce((sum,u)=>sum+u.unit_cost_cents,0),daily:[...dailyMap].map(([day,profit])=>({day,profit})).sort((a,b)=>a.day-b.day),platformRanking:[...platformMap].map(([platform,value])=>({platform,label:PLATFORM_LABELS[platform],...value})).sort((a,b)=>b.profit-a.profit),topProducts:productEntries.filter((p)=>p.profit>0).sort((a,b)=>b.profit-a.profit).slice(0,5),losingProducts:productEntries.filter((p)=>p.profit<0).sort((a,b)=>a.profit-b.profit).slice(0,5),longestStaying:validUnits.filter((u)=>ACTIVE_STATUSES.includes(u.status)).map((u)=>({id:u.id,name:productsMap.get(u.product_id)?.name??"未知商品",days:daysSinceCreated(u)})).sort((a,b)=>b.days-a.days).slice(0,5),rows};}
-export function buildCsv(report:MonthlyReport,month:string,basis:ReportBasis):string{const header=["品名","尺码","进价(分)","寄出快递费(分)","到手价(分)","实际利润(分)","日期"];const lines=report.rows.map((row)=>[row.product.name,row.unit.size,row.unit.unit_cost_cents,row.unit.outbound_shipping_cents,row.sale.actual_payout_cents??"",row.profit,basis==="settled"?row.sale.settled_at:row.sale.sold_at].map(csv).join(","));return "\uFEFF"+[header.join(","),...lines,"",`月份,${month}`,`实际利润(分),${report.actualProfitTotal}`].join("\n");}function csv(value:unknown):string{const text=String(value??"");return /[",\n]/.test(text)?`"${text.replace(/"/g,'""')}"`:text;}
+import type {
+  InventoryUnit,
+  Product,
+  PurchaseBatch,
+  Sale,
+} from "@/lib/types/database";
+import { actualProfitCents } from "@/lib/utils/profit";
+
+export interface ReportRow {
+  unit: InventoryUnit;
+  sale: Sale;
+  product: Product;
+  batch: PurchaseBatch;
+  profit: number;
+}
+
+export interface SettlementSummary {
+  profitCents: number;
+  salesCents: number;
+  salesCount: number;
+}
+
+export interface SettlementReport {
+  allTime: SettlementSummary;
+  selectedMonth: SettlementSummary;
+  rows: ReportRow[];
+}
+
+export interface ReportInput {
+  units: InventoryUnit[];
+  products: Product[];
+  batches: PurchaseBatch[];
+  sales: Sale[];
+  month: string;
+}
+
+function summarize(rows: ReportRow[]): SettlementSummary {
+  return {
+    profitCents: rows.reduce((sum, row) => sum + row.profit, 0),
+    salesCents: rows.reduce(
+      (sum, row) => sum + (row.sale.actual_payout_cents ?? 0),
+      0,
+    ),
+    salesCount: rows.length,
+  };
+}
+
+export function buildSettlementReport(input: ReportInput): SettlementReport {
+  const unitMap = new Map(
+    input.units
+      .filter((unit) => unit.status !== "refunded")
+      .map((unit) => [unit.id, unit]),
+  );
+  const productMap = new Map(
+    input.products.map((product) => [product.id, product]),
+  );
+  const batchMap = new Map(
+    input.batches.map((batch) => [batch.id, batch]),
+  );
+  const allRows = input.sales.flatMap((sale): ReportRow[] => {
+    if (!sale.settled_at || sale.actual_payout_cents == null) return [];
+    const unit = unitMap.get(sale.unit_id);
+    const product = unit ? productMap.get(unit.product_id) : undefined;
+    const batch = unit ? batchMap.get(unit.batch_id) : undefined;
+    if (!unit || !product || !batch) return [];
+    const profit = actualProfitCents(
+      unit.unit_cost_cents,
+      unit.outbound_shipping_cents,
+      sale.actual_payout_cents,
+    );
+    return profit == null ? [] : [{ unit, sale, product, batch, profit }];
+  });
+  const rows = allRows.filter((row) =>
+    row.sale.settled_at?.startsWith(input.month),
+  );
+
+  return {
+    allTime: summarize(allRows),
+    selectedMonth: summarize(rows),
+    rows,
+  };
+}
+
+export function buildCsv(report: SettlementReport, month: string): string {
+  const detailHeader = [
+    "品名",
+    "尺码",
+    "进价(分)",
+    "寄出快递费(分)",
+    "实际到账(分)",
+    "利润(分)",
+    "结算日期",
+  ];
+  const details = report.rows.map((row) =>
+    [
+      row.product.name,
+      row.unit.size,
+      row.unit.unit_cost_cents,
+      row.unit.outbound_shipping_cents,
+      row.sale.actual_payout_cents ?? "",
+      row.profit,
+      row.sale.settled_at ?? "",
+    ]
+      .map(csv)
+      .join(","),
+  );
+  const lines = [
+    "范围,利润(分),销售额(分),销量",
+    `历史累计,${report.allTime.profitCents},${report.allTime.salesCents},${report.allTime.salesCount}`,
+    `${month},${report.selectedMonth.profitCents},${report.selectedMonth.salesCents},${report.selectedMonth.salesCount}`,
+    "",
+    detailHeader.join(","),
+    ...details,
+  ];
+  return `\uFEFF${lines.join("\n")}`;
+}
+
+function csv(value: unknown): string {
+  const text = String(value ?? "");
+  return /[",\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
+}
