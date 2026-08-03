@@ -88,6 +88,7 @@ function Detail() {
   const profit = unitProfit(unit, unit.sale);
 
   async function select(to: UnitStatus) {
+    if (!unit) return;
     if (to === "settled") {
       setSale(true);
       return;
