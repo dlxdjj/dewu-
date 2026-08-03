@@ -178,6 +178,14 @@ export async function signInWithMagicLink(email: string): Promise<void> {
   if (response.error) throw response.error;
 }
 
+export async function signInWithPassword(email: string, password: string): Promise<void> {
+  const value = email.trim();
+  if (!/^\S+@\S+\.\S+$/.test(value)) throw new Error("请输入有效邮箱");
+  if (!password) throw new Error("请输入密码");
+  const response = await withAuthTimeout(getSupabase().auth.signInWithPassword({ email: value, password }));
+  if (response.error) throw response.error;
+}
+
 /** Sign out of the active Supabase browser session. */
 export async function signOut(): Promise<void> {
   const response = await withAuthTimeout(getSupabase().auth.signOut());
