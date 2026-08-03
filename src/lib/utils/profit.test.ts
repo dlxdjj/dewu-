@@ -1,0 +1,2 @@
+import { describe,expect,it } from "vitest";import { actualProfitCents,unitProfit } from "./profit";
+describe("profit",()=>{it("returns null before payout",()=>expect(actualProfitCents(10000,334,null)).toBeNull());it("uses payout-cost-shipping",()=>expect(actualProfitCents(10000,334,15000)).toBe(4666));it("accepts zero payout",()=>expect(actualProfitCents(100,1,0)).toBe(-101));it("excludes refunded",()=>expect(unitProfit({status:"refunded",unit_cost_cents:100,outbound_shipping_cents:1},{actual_payout_cents:200}).value).toBeNull());});

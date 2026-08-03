@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import PageHeader from "@/components/ui/PageHeader";
@@ -10,6 +10,7 @@ import { CameraIcon } from "@/components/ui/icons";
 import { compressImage } from "@/components/ui/ImagePicker";
 import {
   OCR_PREFILL_KEY,
+  disposeOcrWorker,
   parseOrderText,
   recognizeText,
   type OcrPrefill,
@@ -26,6 +27,9 @@ export default function OcrPage() {
   const [error, setError] = useState("");
   const [fields, setFields] = useState<OcrPrefill>({});
   const [rawText, setRawText] = useState("");
+  const [durationMs, setDurationMs] = useState(0);
+
+  useEffect(() => () => { void disposeOcrWorker(); }, []);
 
   async function handleFile(file: File | undefined) {
     if (!file) return;
@@ -34,9 +38,10 @@ export default function OcrPage() {
     setError("");
     try {
       const compressed = await compressImage(file, 1600, 0.85);
-      const text = await recognizeText(compressed, setProgress);
-      setRawText(text);
-      setFields(parseOrderText(text));
+      const result = await recognizeText(compressed, setProgress);
+      setRawText(result.text);
+      setDurationMs(result.durationMs);
+      setFields(parseOrderText(result.text));
       setStep("confirm");
     } catch (e) {
       setError(e instanceof Error ? e.message : "识别失败，请重试");
@@ -108,7 +113,7 @@ export default function OcrPage() {
         <>
           <Card className="space-y-4">
             <p className="rounded-lg bg-[#FFF8E6] px-3 py-2 text-[12px] text-[#8a6d00]">
-              请核对以下识别结果，不准确的字段可直接修改
+              OCR 仅提供候选值，空白或不准确字段必须人工核对后再回填。耗时 {(durationMs / 1000).toFixed(1)} 秒
             </p>
             <Field label="品名" optional>
               <input className={inputCls} value={fields.productName ?? ""} onChange={(e) => set("productName", e.target.value)} />

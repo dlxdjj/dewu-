@@ -1,0 +1,2 @@
+import { render,screen } from "@testing-library/react";import { expect,it,vi } from "vitest";vi.mock("@/lib/data",()=>({getDb:()=>({settleUnits:vi.fn()})}));import SaleFormSheet from "./SaleFormSheet";
+it("only shows payout and date inputs",()=>{render(<SaleFormSheet units={[]} onClose={()=>{}} onDone={()=>{}}/>);expect(screen.getByLabelText("实际到手价")).toBeInTheDocument();expect(screen.getByLabelText("结算日期")).toBeInTheDocument();expect(screen.queryByText("平台费用")).not.toBeInTheDocument();});

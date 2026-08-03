@@ -1,20 +1,3 @@
-const cny = new Intl.NumberFormat("zh-CN", {
-  style: "currency",
-  currency: "CNY",
-});
-
-/** 金额格式化，空值显示占位符 */
-export function formatCny(n: number | null | undefined): string {
-  return n == null ? "—" : cny.format(n);
-}
-
-/** 带符号金额（利润展示用），如 +¥120.50 / -¥30.00 */
-export function formatSignedCny(n: number | null | undefined): string {
-  if (n == null) return "—";
-  const abs = cny.format(Math.abs(n));
-  return n > 0 ? `+${abs}` : n < 0 ? `-${abs}` : abs;
-}
-
 /** 日期格式化为 2026/8/1 */
 export function formatDate(iso: string | null | undefined): string {
   if (!iso) return "—";

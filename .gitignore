@@ -2,6 +2,13 @@
 
 # dependencies
 /node_modules
+/.npm-cache
+/.deps
+/.deps-cache
+/.validation-*
+/package-lock.updated.json
+/package-lock.stale.json
+/.tmp-copy-lock.mjs
 /.pnp
 .pnp.*
 .yarn/*
@@ -12,6 +19,8 @@
 
 # testing
 /coverage
+/test-results/
+/playwright-report/
 
 # next.js
 /.next/
@@ -30,8 +39,9 @@ yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
 
-# env files (can opt-in for committing if needed)
+# env files (only the non-sensitive template is publishable)
 .env*
+!/.env.example
 
 # vercel
 .vercel

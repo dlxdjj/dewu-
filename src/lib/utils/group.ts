@@ -6,13 +6,13 @@ export interface UnitGroup {
   key: string;
   product: UnitJoined["product"];
   size: string;
-  unit_cost: number;
+  unit_cost_cents: number;
   status: UnitStatus;
   units: UnitJoined[];
 }
 
 export function groupKey(u: UnitJoined): string {
-  return `${u.product_id}|${u.size}|${u.unit_cost}|${u.status}`;
+  return `${u.product_id}|${u.size}|${u.unit_cost_cents}|${u.status}`;
 }
 
 export function buildGroups(units: UnitJoined[]): UnitGroup[] {
@@ -25,7 +25,7 @@ export function buildGroups(units: UnitJoined[]): UnitGroup[] {
         key,
         product: u.product,
         size: u.size,
-        unit_cost: u.unit_cost,
+        unit_cost_cents: u.unit_cost_cents,
         status: u.status,
         units: [],
       };
@@ -41,7 +41,7 @@ export function groupQuery(g: UnitGroup): string {
   return [
     `product=${g.product.id}`,
     `size=${encodeURIComponent(g.size)}`,
-    `cost=${g.unit_cost}`,
+    `cost=${g.unit_cost_cents}`,
     `status=${g.status}`,
   ].join("&");
 }

@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import BottomNav from "@/components/layout/BottomNav";
+import DataSourceGate from "@/components/ui/DataSourceGate";
 
 export const metadata: Metadata = {
   title: "进销存",
@@ -29,10 +30,10 @@ export default function RootLayout({
     <html lang="zh-CN">
       <body className="min-h-dvh">
         {/* 内容区：移动端单列，底部预留导航高度 */}
-        <main className="mx-auto w-full max-w-lg px-4 pb-28 pt-6">
-          {children}
-        </main>
-        <BottomNav />
+        <DataSourceGate>
+          <main className="mx-auto w-full max-w-lg px-4 pb-28 pt-6">{children}</main>
+          <BottomNav />
+        </DataSourceGate>
       </body>
     </html>
   );

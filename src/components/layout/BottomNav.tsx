@@ -14,6 +14,7 @@ const tabs = [
   { href: "/inventory", label: "库存", Icon: BoxIcon },
   { href: "/add", label: "添加", Icon: PlusCircleIcon },
   { href: "/reports", label: "报表", Icon: ChartIcon },
+  { href: "/settings", label: "设置", Icon: ChartIcon },
 ] as const;
 
 export default function BottomNav() {

@@ -4,7 +4,7 @@ import Link from "next/link";
 import StatusBadge from "./StatusBadge";
 import { BoxIcon } from "./icons";
 import { PLATFORM_LABELS } from "@/lib/constants/platform";
-import { formatCny, formatSignedCny } from "@/lib/utils/format";
+import { formatCents, formatSignedCents } from "@/lib/utils/money";
 import { profitColor } from "@/lib/utils/profit";
 import { groupQuery, type UnitGroup } from "@/lib/utils/group";
 
@@ -50,13 +50,13 @@ export default function GroupCard({
         </p>
         <div className="mt-1.5 flex items-baseline justify-between">
           <p className="text-[12px] text-muted">
-            成本 {formatCny(group.unit_cost)} · 最长 {maxDays} 天
+            进价 {formatCents(group.unit_cost_cents)} · 最长 {maxDays} 天
           </p>
           <p className="text-[14px] font-semibold" style={{ color: profitColor(profitSum) }}>
             {profitSum != null ? (
               <>
                 <span className="mr-0.5 text-[10px] font-normal">计</span>
-                {formatSignedCny(profitSum)}
+                {formatSignedCents(profitSum)}
               </>
             ) : (
               "—"

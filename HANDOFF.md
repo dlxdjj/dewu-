@@ -7,7 +7,7 @@
 个人使用的商品进销存与利润管理 PWA。从淘宝/京东/拼多多/唯品会采购鞋服，发往得物销售。主要使用场景：iPhone Safari + 添加到主屏幕。
 
 - 线上预览（云端沙箱，可能失效）：https://a63bc50d9b2a6f964.sh4.agentos-app.net
-- 技术栈：Next.js 16（App Router）+ TypeScript + Tailwind CSS v4 + Supabase（未接入）
+- 技术栈：Next.js 16（App Router）+ TypeScript + Tailwind CSS v4 + Supabase（真实项目已完成数据库迁移；等待测试用户通过 Magic Link 登录后做业务验收）
 - 设计：苹果简约风。浅灰底 `#F2F2F7`、白色卡片 `rounded-2xl`、系统字体栈、无渐变无发光
 
 ## 本地启动
@@ -19,7 +19,18 @@ npm run build      # 提交前必须通过
 npx eslint src     # 必须零错误零警告
 ```
 
-## 最重要的三个架构决策（不要推翻，有明确理由）
+## 2026-08-02 极简增量后的当前基线
+
+> 下方旧历史描述仅用于追溯；最新实现以 `docs/incremental-prd-simple.md`、`docs/incremental-architecture-simple.md` 和 `docs/engineering-delivery-simple.md` 为准。
+
+- 正式运行已改为 **Supabase-only**：未配置/未登录明确阻断，不再回退 localStorage/IndexedDB 完整数据库；`MemoryDbAdapter` 仅供自动化测试。
+- 金额统一为整数分：进价、单件均摊寄出运费、实际到手价；唯一利润 = 到手价 - 进价 - 均摊寄出运费，未到账为 `null`/“未结算”。
+- 关键复合写使用 Supabase RPC：极简采购、批量寄出、结算、状态变更、采购退款、深度删除和清库。Storage 为 private，读取 signed URL，删除失败进入可重试清理队列。
+- OCR 仍为 tesseract.js + 正则 + 人工确认，已增加 worker 复用/释放与错误反馈；没有引入新 OCR 引擎。
+- 净化 Node 22 环境最终质量关卡已通过：干净 `npm ci` 安装 528 packages、TypeScript、原生 ESLint、Next.js 生产构建全部通过。通用状态 RPC 服务端拒绝 `refunded`/`settled`，分别强制走专用退款与结算 RPC。真实 Supabase 已在空库依次应用 `0001`、`0002` 并通过匿名安全检查。
+- 2026-08-03 已修复 Auth/DataSource 无限 loading：开发与 E2E origin 统一为 `http://localhost:3000`，`127.0.0.1` 会保留 callback 后规范跳转；PKCE code 显式 `exchangeCodeForSession`，hash session 显式写入，回调完成后才执行 `getSession`/订阅 auth；Auth 12 秒、数据 15 秒超时，失败显示错误、重试/返回登录，首页空库显示 0。发布前 BugFix 复核确认原 8 项失败均为 Vitest Mock 未拦截别名/包导出的测试隔离缺陷，已改为显式依赖注入且未弱化断言，并新增超时、不完整 callback、session 错误覆盖。净化 Node 22 干净副本 `npm ci`、Vitest 12 files / 46 tests、TypeScript、原生 ESLint、Next build 13/13 和系统 Chrome production smoke（HTTP 200、未配置页退出 loading）通过。未重发 Magic Link；旧链接仅在明确过期/已使用/origin 不允许时重发。Playwright bundled Chromium 下载及 runner 受宿主网络/进程 I/O 阻断，详见工程交付报告。
+
+## 历史架构决策（已被本次增量部分替代）
 
 ### 1. 双数据层（src/lib/data/）
 
@@ -77,7 +88,7 @@ UI 入口：`StatusChips` 组件（详情页/组页），sold/settled 会弹 `Sa
 
 ## 待办（按用户优先级）
 
-1. Supabase 接入验证（用户建项目后）
+1. 用户点击测试邮箱中的 Magic Link 登录；随后完成真实 Supabase CRUD/RPC/RLS/private Storage/signed URL/清理队列回归
 2. 数据备份/恢复（导出/导入 JSON，防 Safari 清本地存储）
 3. 滞留提醒真实场景验证、阈值是否可调
 4. 登记售出时显示该商品上次成交价（定价参考）

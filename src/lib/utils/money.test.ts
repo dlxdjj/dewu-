@@ -1,0 +1,2 @@
+import { describe,expect,it } from "vitest";import { formatCents,parseYuanToCents } from "./money";
+describe("money",()=>{it.each([["0",0],["0.01",1],["10",1000],["10.0",1000],["10.00",1000]])("parses %s",(text,cents)=>expect(parseYuanToCents(text)).toBe(cents));it.each(["","-1","1.001","1e2","01"])("rejects %s",(text)=>expect(()=>parseYuanToCents(text)).toThrow());it("formats cents",()=>expect(formatCents(1001)).toBe("¥10.01"));});
