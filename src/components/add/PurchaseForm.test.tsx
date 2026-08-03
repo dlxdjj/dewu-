@@ -1,0 +1,138 @@
+import { render, screen, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import { describe, expect, it, vi } from "vitest";
+import { MemoryDbAdapter } from "@/lib/data/memory";
+import PurchaseForm from "./PurchaseForm";
+
+vi.mock("@/components/ui/ImagePicker", () => ({
+  default: ({
+    label,
+    onChange,
+  }: {
+    label: string;
+    onChange: (blob: Blob) => void;
+  }) => (
+    <button
+      type="button"
+      onClick={() =>
+        onChange(new Blob(["test-image"], { type: "image/jpeg" }))
+      }
+    >
+      {label}
+    </button>
+  ),
+}));
+
+const timestamp = "2026-08-01T00:00:00Z";
+
+async function fillRequiredFields(styleCode = "STYLE-001"): Promise<void> {
+  const user = userEvent.setup();
+  await user.type(screen.getByLabelText("品名"), "测试鞋");
+  await user.type(screen.getByLabelText("货号（必填）"), styleCode);
+  await user.type(screen.getByLabelText("尺码"), "42");
+  await user.type(screen.getByLabelText("单件进价（元）"), "100");
+}
+
+describe("PurchaseForm", () => {
+  it("marks style code required and reports whitespace-only input", async () => {
+    const db = new MemoryDbAdapter();
+    render(<PurchaseForm dataSource={db} onComplete={vi.fn()} />);
+
+    expect(screen.getByLabelText("货号（必填）")).toBeRequired();
+    await fillRequiredFields("   ");
+    await userEvent.click(
+      screen.getByRole("button", { name: /保存并生成/ }),
+    );
+
+    expect(await screen.findByText("请填写货号")).toBeInTheDocument();
+    expect(db.snapshot().units).toHaveLength(0);
+  });
+
+  it("shows the newest image for an existing style code", async () => {
+    const db = new MemoryDbAdapter({
+      products: [
+        {
+          id: "p1",
+          user_id: "u1",
+          name: "测试鞋",
+          style_code: "STYLE-001",
+          brand: null,
+          created_at: timestamp,
+          updated_at: timestamp,
+        },
+      ],
+      attachments: [
+        {
+          id: "old",
+          user_id: "u1",
+          owner_type: "product",
+          owner_id: "p1",
+          kind: "product_image",
+          path: "old-image",
+          content_type: "image/jpeg",
+          created_at: timestamp,
+        },
+        {
+          id: "new",
+          user_id: "u1",
+          owner_type: "product",
+          owner_id: "p1",
+          kind: "product_image",
+          path: "new-image",
+          content_type: "image/jpeg",
+          created_at: "2026-08-02T00:00:00Z",
+        },
+      ],
+    });
+    render(<PurchaseForm dataSource={db} onComplete={vi.fn()} />);
+
+    await userEvent.type(screen.getByLabelText("货号（必填）"), "style-001");
+
+    expect(
+      await screen.findByText("该货号已有图片，将默认复用"),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("img", { name: "style-001 已有商品图片" }),
+    ).toHaveAttribute("src", "memory://new-image");
+  });
+
+  it("retries only the image after the purchase has already succeeded", async () => {
+    const db = new MemoryDbAdapter();
+    vi.spyOn(db, "saveAttachment").mockRejectedValueOnce(
+      new Error("upload failed"),
+    );
+    const onComplete = vi.fn();
+    render(<PurchaseForm dataSource={db} onComplete={onComplete} />);
+    await fillRequiredFields();
+    await userEvent.click(
+      screen.getByRole("button", { name: "添加商品图片" }),
+    );
+
+    await userEvent.click(
+      screen.getByRole("button", { name: /保存并生成/ }),
+    );
+    expect(
+      await screen.findByText("商品已保存，但图片上传失败"),
+    ).toBeInTheDocument();
+    expect(db.snapshot().units).toHaveLength(1);
+    expect(db.snapshot().attachments).toHaveLength(0);
+
+    await userEvent.click(
+      screen.getByRole("button", { name: "重试上传图片" }),
+    );
+    await waitFor(() => expect(onComplete).toHaveBeenCalledTimes(1));
+    expect(db.snapshot().units).toHaveLength(1);
+    expect(db.snapshot().attachments).toHaveLength(1);
+  });
+
+  it("constrains the purchase date input to the mobile card width", () => {
+    render(<PurchaseForm dataSource={new MemoryDbAdapter()} onComplete={vi.fn()} />);
+
+    expect(screen.getByLabelText("采购日期")).toHaveClass(
+      "w-full",
+      "min-w-0",
+      "max-w-full",
+      "box-border",
+    );
+  });
+});
