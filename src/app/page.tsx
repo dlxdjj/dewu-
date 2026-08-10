@@ -1,20 +1,15 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import PageHeader from "@/components/ui/PageHeader";
 import Card from "@/components/ui/Card";
+import PageHeader from "@/components/ui/PageHeader";
 import Stat from "@/components/ui/Stat";
 import { getDb } from "@/lib/data";
-import { unitProfit } from "@/lib/utils/profit";
+import {
+  buildHomeSummary,
+  type HomeSummary,
+} from "@/lib/home-summary";
 import { formatCents } from "@/lib/utils/money";
-import { ACTIVE_STATUSES } from "@/lib/constants/status";
-
-interface HomeSummary {
-  count: number;
-  cost: number;
-  profit: number;
-  unsettled: number;
-}
 
 interface HomeDataSource {
   listSales: ReturnType<typeof getDb>["listSales"];
@@ -23,9 +18,12 @@ interface HomeDataSource {
 
 export default function HomePage({
   dataSource,
+  now,
 }: {
   dataSource?: HomeDataSource;
+  now?: Date;
 } = {}) {
+  const [referenceNow] = useState(() => now ?? new Date());
   const [data, setData] = useState<HomeSummary | null>(null);
   const [error, setError] = useState("");
   const [attempt, setAttempt] = useState(0);
@@ -45,27 +43,7 @@ export default function HomePage({
           db.listUnits(),
           db.listSales(),
         ]);
-        if (!active) return;
-        const validUnits = units.filter((unit) => unit.status !== "refunded");
-        const saleMap = new Map(sales.map((sale) => [sale.unit_id, sale]));
-        setData({
-          count: validUnits.filter((unit) =>
-            ACTIVE_STATUSES.includes(unit.status),
-          ).length,
-          cost: validUnits
-            .filter((unit) => ACTIVE_STATUSES.includes(unit.status))
-            .reduce((sum, unit) => sum + unit.unit_cost_cents, 0),
-          profit: validUnits.reduce(
-            (sum, unit) =>
-              sum + (unitProfit(unit, saleMap.get(unit.id)).value ?? 0),
-            0,
-          ),
-          unsettled: validUnits.filter(
-            (unit) =>
-              unit.status === "sold" &&
-              saleMap.get(unit.id)?.actual_payout_cents == null,
-          ).length,
-        });
+        if (active) setData(buildHomeSummary(units, sales, referenceNow));
       } catch (reason: unknown) {
         if (!active) return;
         setError(reason instanceof Error ? reason.message : "加载失败");
@@ -75,7 +53,9 @@ export default function HomePage({
     return () => {
       active = false;
     };
-  }, [attempt, dataSource]);
+  }, [attempt, dataSource, referenceNow]);
+
+  const monthLabel = `${referenceNow.getMonth() + 1}月`;
 
   return (
     <>
@@ -94,32 +74,27 @@ export default function HomePage({
       ) : (
         <div className="grid grid-cols-2 gap-3">
           <Stat
-            label="有效库存"
-            value={data ? String(data.count) : "…"}
-            hint="退款件已排除"
+            label="库存数量"
+            value={data ? String(data.inventoryCount) : "…"}
+            hint="件"
           />
           <Stat
-            label="库存资金"
-            value={data ? formatCents(data.cost) : "…"}
+            label="库存成本"
+            value={data ? formatCents(data.inventoryCostCents) : "…"}
             hint="按单件进价"
           />
           <Stat
-            label="实际利润"
-            value={data ? formatCents(data.profit) : "…"}
-            hint="仅已结算"
+            label={`${data?.monthLabel ?? monthLabel}销量`}
+            value={data ? String(data.monthlySalesCount) : "…"}
+            hint="已结算"
           />
           <Stat
-            label="未结算"
-            value={data ? String(data.unsettled) : "…"}
-            hint="件"
+            label={`${data?.monthLabel ?? monthLabel}利润`}
+            value={data ? formatCents(data.monthlyProfitCents) : "…"}
+            hint="实际到账口径"
           />
         </div>
       )}
-      <Card className="mt-4">
-        <p className="text-sm text-muted">
-          利润唯一口径：到手价 − 进价 − 均摊寄出快递费。
-        </p>
-      </Card>
     </>
   );
 }

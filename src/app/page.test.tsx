@@ -12,15 +12,26 @@ const dataSource = {
   listSales: dataMocks.listSales,
 };
 
-describe("HomePage initial data load", () => {
-  it("renders a logged-in empty database as zero values", async () => {
+describe("HomePage", () => {
+  it("renders exactly the four agreed metrics for the current month", async () => {
     dataMocks.listUnits.mockResolvedValue([]);
     dataMocks.listSales.mockResolvedValue([]);
 
-    render(<HomePage dataSource={dataSource} />);
+    render(
+      <HomePage
+        dataSource={dataSource}
+        now={new Date("2026-08-04T12:00:00+02:00")}
+      />,
+    );
 
-    expect(await screen.findAllByText("0", { selector: "p" })).toHaveLength(2);
-    expect(screen.getAllByText("¥0.00")).toHaveLength(2);
+    expect(await screen.findByText("库存数量")).toBeInTheDocument();
+    expect(screen.getByText("库存成本")).toBeInTheDocument();
+    expect(screen.getByText("8月销量")).toBeInTheDocument();
+    expect(screen.getByText("8月利润")).toBeInTheDocument();
+    expect(screen.queryByText("有效库存")).not.toBeInTheDocument();
+    expect(screen.queryByText("库存资金")).not.toBeInTheDocument();
+    expect(screen.queryByText("未结算")).not.toBeInTheDocument();
+    expect(screen.queryByText(/利润唯一口径/)).not.toBeInTheDocument();
     expect(screen.queryByText("…")).not.toBeInTheDocument();
   });
 
@@ -28,7 +39,12 @@ describe("HomePage initial data load", () => {
     dataMocks.listUnits.mockRejectedValue(new Error("读取数据库超时"));
     dataMocks.listSales.mockResolvedValue([]);
 
-    render(<HomePage dataSource={dataSource} />);
+    render(
+      <HomePage
+        dataSource={dataSource}
+        now={new Date("2026-08-04T12:00:00+02:00")}
+      />,
+    );
 
     expect(await screen.findByText("读取数据库超时")).toBeInTheDocument();
     expect(

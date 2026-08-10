@@ -23,7 +23,7 @@ export interface DbAdapter {
   readonly kind: "supabase" | "memory";
   listProducts(): Promise<Product[]>; listBatches(): Promise<PurchaseBatch[]>; listUnits(): Promise<InventoryUnit[]>;
   listSales(): Promise<Sale[]>; listHistory(unitId?: string): Promise<StatusHistory[]>;
-  listAttachments(ownerType: AttachmentOwner, ownerId: string): Promise<Attachment[]>;
+  listAttachments(ownerType: AttachmentOwner, ownerId?: string): Promise<Attachment[]>;
   attachmentUrl(attachment: Attachment): Promise<string>; saveAttachment(input: SaveAttachmentInput): Promise<Attachment>;
   createPurchase(input: PurchaseInput): Promise<PurchaseResult>;
   shipUnits(input: ShipUnitsInput): Promise<ShipUnitsResult>;
