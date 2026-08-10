@@ -41,6 +41,13 @@ describe("GroupCard", () => {
     expect(screen.getByText("已到货 1")).toBeInTheDocument();
     expect(screen.getByText("发往得物途中 1")).toBeInTheDocument();
     expect(screen.getByLabelText("库存状态")).toBeInTheDocument();
+    expect(screen.getByRole("link")).toHaveClass(
+      "min-w-0",
+      "max-w-full",
+      "overflow-hidden",
+    );
+    expect(screen.getByText("AB-1 · 42")).toHaveClass("text-sm");
+    expect(screen.getByText("成本合计 ¥3.00")).toHaveClass("text-sm");
     expect(screen.getByRole("img", { name: "测试鞋" })).toHaveAttribute(
       "src",
       "https://signed.example/image",

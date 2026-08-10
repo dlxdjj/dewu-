@@ -143,7 +143,7 @@ export default function InventoryPage({
             setSelecting((value) => !value);
             setSelected(new Set());
           }}
-          className="h-9 shrink-0 rounded-full bg-card px-4 text-sm"
+          className="min-h-11 shrink-0 rounded-full bg-card px-4 text-[15px]"
         >
           {selecting ? "退出批量" : "批量操作"}
         </button>
@@ -155,7 +155,7 @@ export default function InventoryPage({
             type="button"
             aria-pressed={platformFilter === "all"}
             onClick={() => switchPlatform("all")}
-            className={`shrink-0 rounded-full px-4 py-2 text-sm ${
+            className={`min-h-11 shrink-0 rounded-full px-4 py-2 text-[15px] ${
               platformFilter === "all"
                 ? "bg-label text-card"
                 : "bg-card text-label"
@@ -169,7 +169,7 @@ export default function InventoryPage({
               type="button"
               aria-pressed={platformFilter === option.value}
               onClick={() => switchPlatform(option.value)}
-              className={`shrink-0 rounded-full px-4 py-2 text-sm ${
+              className={`min-h-11 shrink-0 rounded-full px-4 py-2 text-[15px] ${
                 platformFilter === option.value
                   ? "bg-label text-card"
                   : "bg-card text-label"
@@ -199,7 +199,7 @@ export default function InventoryPage({
           <EmptyState title="该平台暂无库存" subtitle="请选择其他购入平台" />
         </Card>
       ) : (
-        <div className="grid gap-2 md:grid-cols-2">
+        <div className="grid min-w-0 gap-3 md:grid-cols-2">
           {groups.map((group) => (
             <GroupCard
               key={group.key}
@@ -217,14 +217,14 @@ export default function InventoryPage({
       {selecting && (
         <div className="fixed inset-x-0 bottom-[calc(56px+env(safe-area-inset-bottom))] z-40 border-t border-separator bg-card p-3">
           <div className="mx-auto flex max-w-3xl flex-wrap gap-2">
-            <span className="w-full text-center text-xs text-muted">
+            <span className="w-full text-center text-sm text-muted">
               已选 {selected.size} 件
             </span>
             <button
               type="button"
               disabled={!selected.size}
               onClick={() => setShipping(true)}
-              className="flex-1 rounded-xl bg-tint py-2.5 text-sm text-white disabled:opacity-40"
+              className="min-h-11 flex-1 rounded-xl bg-tint py-2.5 text-[15px] text-white disabled:opacity-40"
             >
               批量寄出
             </button>
@@ -232,7 +232,7 @@ export default function InventoryPage({
               type="button"
               disabled={!selected.size}
               onClick={() => setSettling(true)}
-              className="flex-1 rounded-xl bg-[#1B7F37] py-2.5 text-sm text-white disabled:opacity-40"
+              className="min-h-11 flex-1 rounded-xl bg-[#1B7F37] py-2.5 text-[15px] text-white disabled:opacity-40"
             >
               录到手价
             </button>
@@ -240,7 +240,7 @@ export default function InventoryPage({
               aria-label="目标状态"
               value={target}
               onChange={(event) => setTarget(event.target.value as UnitStatus)}
-              className="min-w-0 flex-1 rounded-xl bg-background px-2 text-sm"
+              className="min-h-11 min-w-0 flex-1 rounded-xl bg-background px-2 text-[15px]"
             >
               {BATCH_STATUS_TARGETS.map((status) => (
                 <option key={status} value={status}>
@@ -263,7 +263,7 @@ export default function InventoryPage({
                   setChangingStatus(false);
                 }
               }}
-              className="rounded-xl bg-label px-4 py-2.5 text-sm text-white disabled:opacity-40"
+              className="min-h-11 rounded-xl bg-label px-4 py-2.5 text-[15px] text-white disabled:opacity-40"
             >
               {changingStatus ? "处理中…" : "改状态"}
             </button>
@@ -298,15 +298,15 @@ export default function InventoryPage({
 
 function InventorySkeleton() {
   return (
-    <div role="status" aria-label="正在加载库存" className="grid gap-2 md:grid-cols-2">
+    <div role="status" aria-label="正在加载库存" className="grid min-w-0 gap-3 md:grid-cols-2">
       <span className="sr-only">正在加载库存…</span>
       {[0, 1, 2, 3].map((item) => (
         <div
           key={item}
           aria-hidden="true"
-          className="flex animate-pulse gap-3 rounded-2xl bg-card p-3"
+          className="flex min-w-0 animate-pulse gap-3 rounded-2xl bg-card p-4"
         >
-          <div className="h-16 w-16 shrink-0 rounded-xl bg-separator" />
+          <div className="h-[72px] w-[72px] shrink-0 rounded-xl bg-separator" />
           <div className="flex-1 space-y-2 py-1">
             <div className="h-4 w-3/4 rounded bg-separator" />
             <div className="h-3 w-1/2 rounded bg-separator" />
