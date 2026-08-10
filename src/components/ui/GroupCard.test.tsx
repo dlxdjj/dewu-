@@ -47,6 +47,7 @@ describe("GroupCard", () => {
       "overflow-hidden",
     );
     expect(screen.getByText("AB-1 · 42")).toHaveClass("text-sm");
+    expect(screen.getByText("已到货 1")).toHaveClass("text-sm");
     expect(screen.getByText("成本合计 ¥3.00")).toHaveClass("text-sm");
     expect(screen.getByRole("img", { name: "测试鞋" })).toHaveAttribute(
       "src",

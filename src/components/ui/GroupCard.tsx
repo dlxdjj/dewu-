@@ -71,7 +71,7 @@ export default function GroupCard({
               return (
                 <span
                   key={status}
-                  className="inline-flex items-center gap-1 rounded-full bg-background px-2 py-1 text-[13px] leading-4 text-label"
+                  className="inline-flex items-center gap-1 rounded-full bg-background px-2 py-1 text-sm leading-5 text-label"
                 >
                   <span
                     aria-hidden="true"
