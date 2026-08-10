@@ -1,6 +1,6 @@
 import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { MemoryDbAdapter } from "@/lib/data/memory";
 import ReportsPage from "./page";
 
@@ -44,6 +44,11 @@ async function settledDb(): Promise<MemoryDbAdapter> {
 }
 
 describe("ReportsPage", () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+    vi.unstubAllGlobals();
+  });
+
   it("shows lifetime totals and changes only the selected-month totals", async () => {
     const db = await settledDb();
     render(<ReportsPage dataSource={db} initialMonth="2026-08" />);
@@ -66,5 +71,34 @@ describe("ReportsPage", () => {
     expect(within(monthly).getByText("¥120.00")).toBeInTheDocument();
     expect(within(lifetime).getByText("¥90.00")).toBeInTheDocument();
     expect(screen.queryByText(/当前有效库存资金/)).not.toBeInTheDocument();
+  });
+
+  it("downloads the selected-month report as a CSV file", async () => {
+    const db = await settledDb();
+    const createObjectUrl = vi.fn<(blob: Blob) => string>(() => "blob:report");
+    const revokeObjectUrl = vi.fn();
+    vi.stubGlobal("URL", {
+      createObjectURL: createObjectUrl,
+      revokeObjectURL: revokeObjectUrl,
+    });
+    const clickAnchor = vi
+      .spyOn(HTMLAnchorElement.prototype, "click")
+      .mockImplementation(() => undefined);
+
+    render(<ReportsPage dataSource={db} initialMonth="2026-08" />);
+    await userEvent.click(
+      await screen.findByRole("button", { name: "导出 CSV" }),
+    );
+
+    expect(createObjectUrl).toHaveBeenCalledTimes(1);
+    const blob = createObjectUrl.mock.calls[0][0];
+    expect(blob.type).toBe("text/csv;charset=utf-8");
+    expect(clickAnchor).toHaveBeenCalledTimes(1);
+    const clickedAnchor = clickAnchor.mock.contexts[0] as
+      | HTMLAnchorElement
+      | undefined;
+    expect(clickedAnchor?.download).toBe("报表-2026-08.csv");
+    expect(clickedAnchor?.href).toBe("blob:report");
+    expect(revokeObjectUrl).toHaveBeenCalledWith("blob:report");
   });
 });
