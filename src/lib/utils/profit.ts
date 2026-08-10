@@ -20,7 +20,7 @@ export function unitProfit(unit: Pick<InventoryUnit, "status" | "unit_cost_cents
   return { kind: value == null ? "none" : "actual", value };
 }
 
-export function profitColor(value: number | null | undefined): string { return value == null || value === 0 ? "#8E8E93" : value > 0 ? "#34C759" : "#FF3B30"; }
+export function profitColor(value: number | null | undefined): string { return value == null || value === 0 ? "#636366" : value > 0 ? "#1B7F37" : "#D70015"; }
 export function profitMargin(profitCents: number, unitCostCents: number): number | null { return unitCostCents > 0 ? profitCents / unitCostCents : null; }
 export function daysInStatus(unit: Pick<InventoryUnit, "created_at">, lastChangeAt: string | null, now = new Date()): number { return Math.max(0, Math.floor((now.getTime() - new Date(lastChangeAt ?? unit.created_at).getTime()) / 86_400_000)); }
 export function daysSinceCreated(unit: Pick<InventoryUnit, "created_at">, now = new Date()): number { return daysInStatus(unit, null, now); }

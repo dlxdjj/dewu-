@@ -31,7 +31,7 @@ export default function RootLayout({
       <body className="min-h-dvh">
         {/* 内容区：移动端单列，底部预留导航高度 */}
         <DataSourceGate>
-          <main className="mx-auto w-full max-w-lg px-4 pb-28 pt-6">{children}</main>
+          <main className="mx-auto w-full max-w-3xl px-4 pb-32 pt-6">{children}</main>
           <BottomNav />
         </DataSourceGate>
       </body>

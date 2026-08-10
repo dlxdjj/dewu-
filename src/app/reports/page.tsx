@@ -70,10 +70,12 @@ export default function ReportsPage({
 
   return (
     <>
-      <PageHeader title="报表" subtitle="实际结算与实际到账口径" />
+      <PageHeader title="报表" subtitle="仅统计已结算记录与实际到账" />
       {error ? (
         <Card>
-          <p className="text-sm text-[#FF3B30]">{error}</p>
+          <p role="alert" className="text-sm text-danger">
+            {error}
+          </p>
         </Card>
       ) : (
         <>
@@ -98,6 +100,14 @@ export default function ReportsPage({
             title={`${monthText}结算`}
             summary={report?.selectedMonth ?? null}
           />
+          {report?.selectedMonth.salesCount === 0 && (
+            <p
+              role="status"
+              className="mt-3 rounded-2xl bg-card px-4 py-3 text-sm leading-6 text-muted"
+            >
+              本月暂无已结算记录，完成结算后将显示销售额和利润。
+            </p>
+          )}
         </>
       )}
       <button

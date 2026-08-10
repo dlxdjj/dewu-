@@ -167,7 +167,7 @@ function GroupContent({
                     );
                   }
                 }}
-                className="text-sm text-[#FF3B30]"
+                className="text-sm text-danger"
               >
                 删除一件
               </button>
@@ -175,7 +175,11 @@ function GroupContent({
           </div>
         ))}
       </div>
-      {error && <p className="mt-3 text-sm text-[#FF3B30]">{error}</p>}
+      {error && (
+        <p role="alert" className="mt-3 text-sm text-danger">
+          {error}
+        </p>
+      )}
     </>
   );
 }

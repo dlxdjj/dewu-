@@ -18,7 +18,7 @@ import { createPurchase } from "@/lib/services/purchase";
 import { todayStr } from "@/lib/utils/format";
 
 const inputClass =
-  "w-full min-w-0 max-w-full box-border rounded-xl bg-background px-3 py-3 text-base outline-none";
+  "w-full min-w-0 max-w-full box-border rounded-xl bg-background px-3 py-3 text-base";
 
 interface PurchaseFormState {
   productName: string;
@@ -176,7 +176,7 @@ export default function PurchaseForm({
   }
 
   return (
-    <>
+    <div className="mx-auto w-full max-w-xl">
       <PageHeader title="添加" subtitle="录入采购并保存商品图片" />
       <Link
         href="/add/ocr"
@@ -187,9 +187,9 @@ export default function PurchaseForm({
       <form onSubmit={submit}>
         <Card className="min-w-0 space-y-4 overflow-hidden">
           <label className="block min-w-0 text-sm">
-            品名
+            品名（必填）
             <input
-              aria-label="品名"
+              aria-label="品名（必填）"
               required
               className={`${inputClass} mt-1`}
               value={form.productName}
@@ -212,9 +212,9 @@ export default function PurchaseForm({
               />
             </label>
             <label className="min-w-0 text-sm">
-              尺码
+              尺码（必填）
               <input
-                aria-label="尺码"
+                aria-label="尺码（必填）"
                 required
                 className={`${inputClass} mt-1`}
                 value={form.size}
@@ -222,9 +222,9 @@ export default function PurchaseForm({
               />
             </label>
             <label className="min-w-0 text-sm">
-              单件进价（元）
+              单件进价（元，必填）
               <input
-                aria-label="单件进价（元）"
+                aria-label="单件进价（元，必填）"
                 required
                 inputMode="decimal"
                 className={`${inputClass} mt-1`}
@@ -234,9 +234,9 @@ export default function PurchaseForm({
               />
             </label>
             <label className="min-w-0 text-sm">
-              数量
+              数量（必填）
               <input
-                aria-label="数量"
+                aria-label="数量（必填）"
                 required
                 inputMode="numeric"
                 className={`${inputClass} mt-1`}
@@ -246,9 +246,9 @@ export default function PurchaseForm({
             </label>
           </div>
           <label className="block min-w-0 max-w-full text-sm">
-            采购日期
+            采购日期（必填）
             <input
-              aria-label="采购日期"
+              aria-label="采购日期（必填）"
               required
               type="date"
               className={`${inputClass} mt-1`}
@@ -322,7 +322,7 @@ export default function PurchaseForm({
           />
         </Card>
         {error && (
-          <p aria-live="polite" className="mt-3 text-center text-sm text-[#FF3B30]">
+          <p role="alert" aria-live="polite" className="mt-3 text-center text-sm text-danger">
             {error}
           </p>
         )}
@@ -356,6 +356,6 @@ export default function PurchaseForm({
           </button>
         )}
       </form>
-    </>
+    </div>
   );
 }

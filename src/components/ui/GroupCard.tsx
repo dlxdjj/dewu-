@@ -26,10 +26,10 @@ export default function GroupCard({
   selected: boolean;
   onToggle: () => void;
 }) {
-  const statusText = UNIT_STATUSES.flatMap((status) => {
+  const statuses = UNIT_STATUSES.flatMap((status) => {
     const count = group.statusCounts[status] ?? 0;
-    return count ? [`${STATUS_META[status].label} ${count}`] : [];
-  }).join(" · ");
+    return count ? [{ count, status }] : [];
+  });
   const platformText = group.platforms
     .map((platform) => PLATFORM_LABELS[platform])
     .join(" · ");
@@ -60,13 +60,30 @@ export default function GroupCard({
             ×{group.units.length}
           </span>
         </div>
-        <p className="mt-0.5 truncate text-[12px] text-muted">
+        <p className="mt-0.5 truncate text-xs text-muted">
           {group.styleCode || "历史无货号"} · {group.size}
         </p>
-        <p className="mt-1 text-[12px] text-muted">{platformText}</p>
+        <p className="mt-1 text-xs text-muted">{platformText}</p>
         <div className="mt-1.5 flex items-end justify-between gap-2">
-          <p className="min-w-0 text-[11px] text-muted">{statusText}</p>
-          <p className="shrink-0 text-[12px] font-medium">
+          <div className="flex min-w-0 flex-wrap gap-1" aria-label="库存状态">
+            {statuses.map(({ count, status }) => {
+              const meta = STATUS_META[status];
+              return (
+                <span
+                  key={status}
+                  className="inline-flex items-center gap-1 rounded-full bg-background px-2 py-0.5 text-xs text-label"
+                >
+                  <span
+                    aria-hidden="true"
+                    className="h-1.5 w-1.5 rounded-full"
+                    style={{ backgroundColor: meta.color }}
+                  />
+                  {meta.label} {count}
+                </span>
+              );
+            })}
+          </div>
+          <p className="shrink-0 text-xs font-medium">
             成本合计 {formatCents(group.totalCostCents)}
           </p>
         </div>

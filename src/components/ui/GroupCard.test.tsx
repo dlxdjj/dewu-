@@ -38,7 +38,9 @@ describe("GroupCard", () => {
     expect(screen.getByText("×2")).toBeInTheDocument();
     expect(screen.getByText("成本合计 ¥3.00")).toBeInTheDocument();
     expect(screen.getByText("淘宝 · 拼多多")).toBeInTheDocument();
-    expect(screen.getByText("已到货 1 · 发往得物途中 1")).toBeInTheDocument();
+    expect(screen.getByText("已到货 1")).toBeInTheDocument();
+    expect(screen.getByText("发往得物途中 1")).toBeInTheDocument();
+    expect(screen.getByLabelText("库存状态")).toBeInTheDocument();
     expect(screen.getByRole("img", { name: "测试鞋" })).toHaveAttribute(
       "src",
       "https://signed.example/image",

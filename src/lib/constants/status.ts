@@ -33,14 +33,14 @@ export const BATCH_STATUS_TARGETS = [
 ] as const satisfies readonly UnitStatus[];
 
 export const STATUS_META: Record<UnitStatus, { label: string; color: string }> = {
-  pending: { label: "未到货", color: "#FF9500" },
-  arrived: { label: "已到货", color: "#0A84FF" },
-  shipping: { label: "发往得物途中", color: "#FF9500" },
-  in_stock_dewu: { label: "得物仓未售", color: "#AF52DE" },
-  sold: { label: "已售待结算", color: "#FF9F0A" },
-  settled: { label: "已结算", color: "#34C759" },
-  returned: { label: "退回", color: "#FF3B30" },
-  refunded: { label: "退款", color: "#8E8E93" },
+  pending: { label: "未到货", color: "#9A5700" },
+  arrived: { label: "已到货", color: "#0067C0" },
+  shipping: { label: "发往得物途中", color: "#9A5700" },
+  in_stock_dewu: { label: "得物仓未售", color: "#7B2CBF" },
+  sold: { label: "已售待结算", color: "#9A5700" },
+  settled: { label: "已结算", color: "#1B7F37" },
+  returned: { label: "退回", color: "#D70015" },
+  refunded: { label: "退款", color: "#636366" },
 };
 
 /** 状态直达：除自身外任意状态可互转 */

@@ -101,4 +101,19 @@ describe("ReportsPage", () => {
     expect(clickedAnchor?.href).toBe("blob:report");
     expect(revokeObjectUrl).toHaveBeenCalledWith("blob:report");
   });
+
+  it("explains an empty selected month", async () => {
+    render(
+      <ReportsPage
+        dataSource={new MemoryDbAdapter()}
+        initialMonth="2026-08"
+      />,
+    );
+
+    expect(
+      await screen.findByText(
+        "本月暂无已结算记录，完成结算后将显示销售额和利润。",
+      ),
+    ).toBeInTheDocument();
+  });
 });

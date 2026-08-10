@@ -98,7 +98,9 @@ export default function OcrPage() {
 
       {step === "failed" && (
         <Card className="space-y-3">
-          <p className="py-2 text-center text-[14px] text-[#FF3B30]">{error}</p>
+          <p role="alert" className="py-2 text-center text-[14px] text-danger">
+            {error}
+          </p>
           <button
             type="button"
             onClick={() => setStep("pick")}

@@ -145,7 +145,7 @@ export default function InventoryPage({
           }}
           className="h-9 shrink-0 rounded-full bg-card px-4 text-sm"
         >
-          {selecting ? "取消" : "批量"}
+          {selecting ? "退出批量" : "批量操作"}
         </button>
       </div>
 
@@ -183,21 +183,23 @@ export default function InventoryPage({
 
       {error ? (
         <Card>
-          <p className="text-sm text-[#FF3B30]">{error}</p>
+          <p role="alert" className="text-sm text-danger">{error}</p>
           <button type="button" onClick={load} className="mt-2 text-sm text-tint">
             重试
           </button>
         </Card>
-      ) : !loading && units.length === 0 ? (
+      ) : loading ? (
+        <InventorySkeleton />
+      ) : units.length === 0 ? (
         <Card>
           <EmptyState title="暂无库存" subtitle="点底部“添加”录入第一件商品" />
         </Card>
-      ) : !loading && groups.length === 0 ? (
+      ) : groups.length === 0 ? (
         <Card>
           <EmptyState title="该平台暂无库存" subtitle="请选择其他购入平台" />
         </Card>
       ) : (
-        <div className="space-y-2">
+        <div className="grid gap-2 md:grid-cols-2">
           {groups.map((group) => (
             <GroupCard
               key={group.key}
@@ -213,8 +215,8 @@ export default function InventoryPage({
       )}
 
       {selecting && (
-        <div className="fixed inset-x-0 bottom-[calc(49px+env(safe-area-inset-bottom))] z-40 border-t border-separator bg-card p-3">
-          <div className="mx-auto flex max-w-lg flex-wrap gap-2">
+        <div className="fixed inset-x-0 bottom-[calc(56px+env(safe-area-inset-bottom))] z-40 border-t border-separator bg-card p-3">
+          <div className="mx-auto flex max-w-3xl flex-wrap gap-2">
             <span className="w-full text-center text-xs text-muted">
               已选 {selected.size} 件
             </span>
@@ -230,7 +232,7 @@ export default function InventoryPage({
               type="button"
               disabled={!selected.size}
               onClick={() => setSettling(true)}
-              className="flex-1 rounded-xl bg-[#34C759] py-2.5 text-sm text-white disabled:opacity-40"
+              className="flex-1 rounded-xl bg-[#1B7F37] py-2.5 text-sm text-white disabled:opacity-40"
             >
               录到手价
             </button>
@@ -291,5 +293,27 @@ export default function InventoryPage({
         />
       )}
     </>
+  );
+}
+
+function InventorySkeleton() {
+  return (
+    <div role="status" aria-label="正在加载库存" className="grid gap-2 md:grid-cols-2">
+      <span className="sr-only">正在加载库存…</span>
+      {[0, 1, 2, 3].map((item) => (
+        <div
+          key={item}
+          aria-hidden="true"
+          className="flex animate-pulse gap-3 rounded-2xl bg-card p-3"
+        >
+          <div className="h-16 w-16 shrink-0 rounded-xl bg-separator" />
+          <div className="flex-1 space-y-2 py-1">
+            <div className="h-4 w-3/4 rounded bg-separator" />
+            <div className="h-3 w-1/2 rounded bg-separator" />
+            <div className="h-3 w-2/3 rounded bg-separator" />
+          </div>
+        </div>
+      ))}
+    </div>
   );
 }

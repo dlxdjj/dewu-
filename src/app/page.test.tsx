@@ -33,6 +33,9 @@ describe("HomePage", () => {
     expect(screen.queryByText("未结算")).not.toBeInTheDocument();
     expect(screen.queryByText(/利润唯一口径/)).not.toBeInTheDocument();
     expect(screen.queryByText("…")).not.toBeInTheDocument();
+    expect(
+      screen.getByText("本月暂无已结算销售；完成结算后将显示销量和利润。"),
+    ).toBeInTheDocument();
   });
 
   it("exits placeholder state and provides retry after a data error", async () => {
@@ -46,7 +49,7 @@ describe("HomePage", () => {
       />,
     );
 
-    expect(await screen.findByText("读取数据库超时")).toBeInTheDocument();
+    expect(await screen.findByRole("alert")).toHaveTextContent("读取数据库超时");
     expect(
       screen.getByRole("button", { name: "重试加载" }),
     ).toBeInTheDocument();

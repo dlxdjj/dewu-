@@ -27,10 +27,10 @@ const timestamp = "2026-08-01T00:00:00Z";
 
 async function fillRequiredFields(styleCode = "STYLE-001"): Promise<void> {
   const user = userEvent.setup();
-  await user.type(screen.getByLabelText("品名"), "测试鞋");
+  await user.type(screen.getByLabelText("品名（必填）"), "测试鞋");
   await user.type(screen.getByLabelText("货号（必填）"), styleCode);
-  await user.type(screen.getByLabelText("尺码"), "42");
-  await user.type(screen.getByLabelText("单件进价（元）"), "100");
+  await user.type(screen.getByLabelText("尺码（必填）"), "42");
+  await user.type(screen.getByLabelText("单件进价（元，必填）"), "100");
 }
 
 describe("PurchaseForm", () => {
@@ -48,6 +48,11 @@ describe("PurchaseForm", () => {
     render(<PurchaseForm dataSource={db} onComplete={vi.fn()} />);
 
     expect(screen.getByLabelText("货号（必填）")).toBeRequired();
+    expect(screen.getByLabelText("品名（必填）")).toBeRequired();
+    expect(screen.getByLabelText("尺码（必填）")).toBeRequired();
+    expect(screen.getByLabelText("单件进价（元，必填）")).toBeRequired();
+    expect(screen.getByLabelText("数量（必填）")).toBeRequired();
+    expect(screen.getByLabelText("采购日期（必填）")).toBeRequired();
     await fillRequiredFields("   ");
     await userEvent.click(
       screen.getByRole("button", { name: /保存并生成/ }),
@@ -137,7 +142,7 @@ describe("PurchaseForm", () => {
   it("constrains the purchase date input to the mobile card width", () => {
     render(<PurchaseForm dataSource={new MemoryDbAdapter()} onComplete={vi.fn()} />);
 
-    expect(screen.getByLabelText("采购日期")).toHaveClass(
+    expect(screen.getByLabelText("采购日期（必填）")).toHaveClass(
       "w-full",
       "min-w-0",
       "max-w-full",

@@ -62,7 +62,9 @@ export default function HomePage({
       <PageHeader title="首页" subtitle="极简进销存" />
       {error ? (
         <Card>
-          <p className="text-sm text-[#FF3B30]">{error}</p>
+          <p role="alert" className="text-sm text-danger">
+            {error}
+          </p>
           <button
             type="button"
             onClick={retry}
@@ -72,7 +74,7 @@ export default function HomePage({
           </button>
         </Card>
       ) : (
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
           <Stat
             label="库存数量"
             value={data ? String(data.inventoryCount) : "…"}
@@ -93,6 +95,14 @@ export default function HomePage({
             value={data ? formatCents(data.monthlyProfitCents) : "…"}
             hint="实际到账口径"
           />
+          {data?.monthlySalesCount === 0 && (
+            <p
+              role="status"
+              className="col-span-2 rounded-2xl bg-card px-4 py-3 text-sm leading-6 text-muted md:col-span-4"
+            >
+              本月暂无已结算销售；完成结算后将显示销量和利润。
+            </p>
+          )}
         </div>
       )}
     </>

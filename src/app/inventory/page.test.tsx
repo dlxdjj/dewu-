@@ -30,7 +30,7 @@ describe("InventoryPage", () => {
     );
     await screen.findByText("×3");
 
-    await userEvent.click(screen.getByRole("button", { name: "批量" }));
+    await userEvent.click(screen.getByRole("button", { name: "批量操作" }));
     await userEvent.click(
       screen.getByRole("button", { name: "选择 AB-1 42，共 3 件" }),
     );

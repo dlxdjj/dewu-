@@ -147,12 +147,16 @@ function Detail() {
         </button>
         <button
           onClick={() => setDeleting(true)}
-          className="rounded-xl bg-[#FFE5E5] py-3 text-sm text-[#FF3B30]"
+          className="rounded-xl bg-danger/10 py-3 text-sm text-danger"
         >
           删除此记录
         </button>
       </div>
-      {error && <p className="mt-3 text-center text-sm text-[#FF3B30]">{error}</p>}
+      {error && (
+        <p role="alert" className="mt-3 text-center text-sm text-danger">
+          {error}
+        </p>
+      )}
       {sale && (
         <SaleFormSheet
           units={[unit]}
@@ -186,7 +190,7 @@ function Detail() {
               setBusy(false);
             }
           }}
-          className="w-full rounded-xl bg-[#FF3B30] py-3 text-white"
+          className="w-full rounded-xl bg-danger py-3 text-white"
         >
           确认采购退款
         </button>

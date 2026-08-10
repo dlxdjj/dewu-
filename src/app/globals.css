@@ -5,8 +5,9 @@
   --color-background: #f2f2f7; /* 页面浅灰底 */
   --color-card: #ffffff; /* 白色卡片 */
   --color-label: #1c1c1e; /* 主文字 */
-  --color-muted: #8e8e93; /* 次要文字 */
-  --color-tint: #0a84ff; /* 系统蓝（与 App 图标一致） */
+  --color-muted: #636366; /* 次要文字，满足小字号对比度 */
+  --color-tint: #0067c0; /* 可访问系统蓝 */
+  --color-danger: #d70015; /* 危险操作与错误 */
   --color-separator: #e5e5ea; /* 细分隔线 */
 
   --font-sans:
@@ -24,6 +25,12 @@ body {
   background: var(--color-background);
   color: var(--color-label);
   font-family: var(--font-sans);
+}
+
+/* 所有键盘可操作元素都保留清晰、统一的焦点指示。 */
+:where(a, button, input, select, textarea, summary):focus-visible {
+  outline: 3px solid var(--color-tint);
+  outline-offset: 2px;
 }
 
 /* iOS 底部安全区 */
