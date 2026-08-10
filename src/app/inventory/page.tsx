@@ -10,8 +10,8 @@ import SaleFormSheet from "@/components/ui/SaleFormSheet";
 import { loadProductImageUrls } from "@/lib/catalog";
 import { PLATFORMS } from "@/lib/constants/platform";
 import {
+  BATCH_STATUS_TARGETS,
   STATUS_META,
-  UNIT_STATUSES,
   type UnitStatus,
 } from "@/lib/constants/status";
 import { getDb } from "@/lib/data";
@@ -41,6 +41,7 @@ export default function InventoryPage({
   const [selected, setSelected] = useState(new Set<string>());
   const [shipping, setShipping] = useState(false);
   const [settling, setSettling] = useState(false);
+  const [changingStatus, setChangingStatus] = useState(false);
   const [target, setTarget] = useState<UnitStatus>("arrived");
 
   const resolveDb = useCallback(
@@ -239,24 +240,30 @@ export default function InventoryPage({
               onChange={(event) => setTarget(event.target.value as UnitStatus)}
               className="min-w-0 flex-1 rounded-xl bg-background px-2 text-sm"
             >
-              {UNIT_STATUSES.filter((status) => status !== "refunded").map(
-                (status) => (
-                  <option key={status} value={status}>
-                    {STATUS_META[status].label}
-                  </option>
-                ),
-              )}
+              {BATCH_STATUS_TARGETS.map((status) => (
+                <option key={status} value={status}>
+                  {STATUS_META[status].label}
+                </option>
+              ))}
             </select>
             <button
               type="button"
-              disabled={!selected.size}
+              disabled={!selected.size || changingStatus}
               onClick={async () => {
-                await batchChangeStatus(resolveDb(), chosen, target);
-                await done();
+                setChangingStatus(true);
+                setError("");
+                try {
+                  await batchChangeStatus(resolveDb(), chosen, target);
+                  await done();
+                } catch (reason) {
+                  setError(reason instanceof Error ? reason.message : "状态修改失败");
+                } finally {
+                  setChangingStatus(false);
+                }
               }}
               className="rounded-xl bg-label px-4 py-2.5 text-sm text-white disabled:opacity-40"
             >
-              改状态
+              {changingStatus ? "处理中…" : "改状态"}
             </button>
           </div>
         </div>

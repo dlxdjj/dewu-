@@ -34,6 +34,15 @@ async function fillRequiredFields(styleCode = "STYLE-001"): Promise<void> {
 }
 
 describe("PurchaseForm", () => {
+  it("keeps sale settlement and refund out of purchase initial states", () => {
+    render(<PurchaseForm dataSource={new MemoryDbAdapter()} onComplete={vi.fn()} />);
+
+    const status = screen.getByLabelText("当前状态");
+    expect(status).not.toHaveTextContent("已售待结算");
+    expect(status).not.toHaveTextContent("已结算");
+    expect(status).not.toHaveTextContent("退款");
+  });
+
   it("marks style code required and reports whitespace-only input", async () => {
     const db = new MemoryDbAdapter();
     render(<PurchaseForm dataSource={db} onComplete={vi.fn()} />);

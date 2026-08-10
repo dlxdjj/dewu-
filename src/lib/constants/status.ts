@@ -13,6 +13,25 @@ export const UNIT_STATUSES = [
 
 export type UnitStatus = (typeof UNIT_STATUSES)[number];
 
+/** 新采购不能直接进入需要销售数据或退款确认的状态。 */
+export const PURCHASE_INITIAL_STATUSES = [
+  "pending",
+  "arrived",
+  "shipping",
+  "in_stock_dewu",
+  "returned",
+] as const satisfies readonly UnitStatus[];
+
+/** 批量普通状态变更；结算和退款必须走专用表单/RPC。 */
+export const BATCH_STATUS_TARGETS = [
+  "pending",
+  "arrived",
+  "shipping",
+  "in_stock_dewu",
+  "sold",
+  "returned",
+] as const satisfies readonly UnitStatus[];
+
 export const STATUS_META: Record<UnitStatus, { label: string; color: string }> = {
   pending: { label: "未到货", color: "#FF9500" },
   arrived: { label: "已到货", color: "#0A84FF" },

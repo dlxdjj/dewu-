@@ -20,11 +20,12 @@
    - `supabase/migrations/0001_init.sql`
    - `supabase/migrations/0002_simple_secure.sql`
    - `supabase/migrations/0003_require_style_code.sql`
-3. 已执行过 `0001`、`0002` 的现有项目只执行 `0003`，不要重复执行带初始化职责的旧迁移。
+   - `supabase/migrations/0004_state_integrity.sql`
+3. 已执行过 `0001`、`0002` 的现有项目按未执行版本继续执行 `0003`、`0004`，不要重复执行带初始化职责的旧迁移。
 4. 在 Supabase Auth 创建个人邮箱/密码账户，并关闭不需要的开放注册方式。
 5. 运行 `npm install` 和 `npm run dev`。
 
-`0003` 只强化后续新增采购的货号必填规则。约束采用 `NOT VALID`，不会删除、覆盖或阻塞历史无货号数据；采购 RPC 会对新写入显式返回 `STYLE_CODE_REQUIRED`。
+`0003` 只强化后续新增采购的货号必填规则。约束采用 `NOT VALID`，不会删除、覆盖或阻塞历史无货号数据；采购 RPC 会对新写入显式返回 `STYLE_CODE_REQUIRED`。`0004` 统一维护库存状态与销售记录：离开销售态会清除旧销售数据，进入“已售”会创建未结算销售记录，结算和退款只能走专用 RPC。
 
 不得在前端、GitHub Secrets 以外的文件或 Git 历史中保存 service role key、数据库密码或个人登录密码。附件 bucket 为 private，路径以用户 UID 开头。
 
@@ -39,7 +40,7 @@
 
 ## GitHub Pages 部署
 
-部署工作流监听 `agent/supabase-backup-offline` 分支，并将静态站点发布到 `/dewu-` 子路径。仓库 `Settings → Secrets and variables → Actions → Repository secrets` 需要配置：
+部署工作流监听 `main`，先执行审计、类型检查、Lint、覆盖率、静态导出和两套 390px E2E，再将站点发布到 `/dewu-` 子路径。仓库 `Settings → Secrets and variables → Actions → Repository secrets` 需要配置：
 
 - `NEXT_PUBLIC_SUPABASE_URL`
 - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
@@ -53,11 +54,11 @@
 npm run typecheck
 npm run lint
 npm run test:ci
-npm run build
-npm run verify:export
-npm run e2e
+npm run test:coverage -- --run
+npm run pages:check
+npm run e2e:all
 ```
 
-E2E 默认使用 3000 端口。端口被占用时可设置 `PLAYWRIGHT_PORT`；只有确认目标端口已经运行当前项目时，才设置 `PLAYWRIGHT_REUSE_SERVER=1`。
+常规 E2E 默认使用 3000 端口，未配置态 E2E 使用 3001。端口被占用时可分别设置 `PLAYWRIGHT_PORT`、`PLAYWRIGHT_CONFIGURATION_PORT`；只有确认目标端口已经运行当前项目时，才设置 `PLAYWRIGHT_REUSE_SERVER=1`。
 
 MemoryDbAdapter 仅供自动化测试显式注入，绝不是生产回退。

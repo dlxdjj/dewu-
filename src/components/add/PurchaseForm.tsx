@@ -8,8 +8,8 @@ import PageHeader from "@/components/ui/PageHeader";
 import { findProductByStyleCode, loadProductImageUrls } from "@/lib/catalog";
 import { PLATFORMS, type Platform } from "@/lib/constants/platform";
 import {
+  PURCHASE_INITIAL_STATUSES,
   STATUS_META,
-  UNIT_STATUSES,
   type UnitStatus,
 } from "@/lib/constants/status";
 import { getDb } from "@/lib/data";
@@ -283,7 +283,7 @@ export default function PurchaseForm({
                 set("initialStatus", event.target.value as UnitStatus)
               }
             >
-              {UNIT_STATUSES.map((status) => (
+              {PURCHASE_INITIAL_STATUSES.map((status) => (
                 <option key={status} value={status}>
                   {STATUS_META[status].label}
                 </option>

@@ -175,10 +175,13 @@ function Detail() {
           disabled={busy}
           onClick={async () => {
             setBusy(true);
+            setError("");
             try {
               await refundUnit(getDb(), unit.id, "采购平台退货退款");
               setRefund(false);
               await load();
+            } catch (reason) {
+              setError(reason instanceof Error ? reason.message : "退款失败");
             } finally {
               setBusy(false);
             }

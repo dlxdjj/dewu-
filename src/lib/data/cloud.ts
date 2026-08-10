@@ -126,13 +126,32 @@ export function createSupabaseAdapter(): DbAdapter {
         }),
       );
       if (upload.error) throw new DataAccessError(upload.error.message);
-      return rpc<Attachment>("create_attachment", {
-        p_owner_type: input.owner_type,
-        p_owner_id: input.owner_id,
-        p_kind: input.kind,
-        p_path: path,
-        p_content_type: input.file.type || null,
-      });
+      try {
+        return await rpc<Attachment>("create_attachment", {
+          p_owner_type: input.owner_type,
+          p_owner_id: input.owner_id,
+          p_kind: input.kind,
+          p_path: path,
+          p_content_type: input.file.type || null,
+        });
+      } catch (reason) {
+        // Reconcile first: an RPC timeout may still have committed metadata.
+        const lookup = await withDataTimeout(
+          client
+            .from("attachments")
+            .select("*")
+            .eq("path", path)
+            .limit(1) as PromiseLike<QueryResponse<Attachment[]>>,
+        ).catch(() => null);
+        const committed = lookup && !lookup.error ? lookup.data?.[0] : null;
+        if (committed) return committed;
+        if (lookup && !lookup.error) {
+          await withDataTimeout(
+            client.storage.from(BUCKET).remove([path]),
+          ).catch(() => undefined);
+        }
+        throw reason;
+      }
     },
     createPurchase: (input) =>
       rpc<PurchaseResult>("create_purchase_simple", { p_input: input }),

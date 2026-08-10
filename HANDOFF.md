@@ -6,7 +6,7 @@
 
 - 线上 PWA：<https://dlxdjj.github.io/dewu-/>
 - GitHub：<https://github.com/dlxdjj/dewu->
-- 部署分支：`agent/supabase-backup-offline`
+- 唯一开发与部署分支：`main`
 - 技术栈：Next.js 16 App Router、React 19、TypeScript、Tailwind CSS v4、Supabase Auth/Postgres/Storage
 - 部署方式：Next.js 静态导出 + GitHub Actions + GitHub Pages，base path 为 `/dewu-`
 
@@ -14,7 +14,7 @@
 
 - 生产数据源为 **Supabase-only**；未配置或未登录明确阻断，MemoryDbAdapter 只用于测试。
 - 登录方式为邮箱 + 密码。Supabase Auth 回调仍兼容 PKCE/错误恢复，但日常登录不依赖 Magic Link。
-- `0001_init.sql`、`0002_simple_secure.sql`、`0003_require_style_code.sql` 已应用到真实项目。`0003` 已验证 RPC 含 `STYLE_CODE_REQUIRED` 防线，历史无货号行不会被删除或覆盖；邮箱密码、采购 RPC、同货号商品复用、private Storage 上传和 signed URL 读取均完成真实冒烟，临时数据已清理。
+- `0001_init.sql`、`0002_simple_secure.sql`、`0003_require_style_code.sql` 已应用到真实项目；新增的 `0004_state_integrity.sql` 需要在生产 Supabase 执行。`0003` 已验证 RPC 含 `STYLE_CODE_REQUIRED` 防线，历史无货号行不会被删除或覆盖；邮箱密码、采购 RPC、同货号商品复用、private Storage 上传和 signed URL 读取均完成真实冒烟，临时数据已清理。
 - 新增采购的货号为前端、服务层、Memory adapter 和数据库 RPC 的硬性条件。
 - 商品图片复用现有 `attachments` 表与 private `attachments` bucket；上传前最长边压缩至 1200px、JPEG 0.82，库存通过 signed URL 联网显示。
 - 输入货号时会查找该货号最新图片：不选择新图则复用，选择新图则新增附件并成为最新图。图片上传失败不会回滚已创建的采购，并允许只重试图片。
@@ -52,7 +52,7 @@
 
 ### 状态变更
 
-状态变更统一通过 `src/lib/services/status.ts`。结算、退款、深度删除、批量寄出等复合写继续使用 Supabase RPC，避免前端多次写入造成半完成状态。每次状态变化写入 `status_history`。
+状态变更统一通过 `src/lib/services/status.ts`。新增采购不能直接进入已售、已结算或退款状态；进入已售会创建未结算销售记录，离开销售态会删除旧销售记录；结算、退款、深度删除、批量寄出等复合写继续使用 Supabase RPC，避免前端多次写入造成半完成状态。每次有效状态变化写入 `status_history`。
 
 ## 页面
 
@@ -61,7 +61,7 @@
 - `/add/ocr`：Tesseract.js 浏览器端识别，人工确认后回填添加页。
 - `/inventory`：搜索、购入平台筛选、其他现有筛选与排序、货号 + 尺码分组、批量选择。
 - `/inventory/group`：组内每件商品的平台、成本、状态和操作。
-- `/inventory/[id]`：单件详情、销售信息和状态时间线。
+- `/inventory/detail?id=...`：单件详情、销售信息和状态操作。
 - `/reports`：历史累计三指标、指定月份三指标、明细与 CSV。
 - `/settings`：账户、附件清理重试、清空全部数据。
 
@@ -73,9 +73,9 @@ npm run dev
 npm run typecheck
 npm run lint
 npm run test:ci
-npm run build
-npm run verify:export
-npm run e2e
+npm run test:coverage -- --run
+npm run pages:check
+npm run e2e:all
 ```
 
 本地默认 <http://localhost:3000>。GitHub Pages 构建需要三个 Repository secrets：`NEXT_PUBLIC_SUPABASE_URL`、`NEXT_PUBLIC_SUPABASE_ANON_KEY`、`NEXT_PUBLIC_AUTH_REDIRECT_URL`。生产 redirect 必须是 `https://dlxdjj.github.io/dewu-/`。

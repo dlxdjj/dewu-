@@ -2,8 +2,11 @@ import { existsSync } from "node:fs";
 import { defineConfig, devices } from "@playwright/test";
 
 const projectRoot = __dirname;
-const systemChrome = "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe";
-const executablePath = existsSync(systemChrome) ? systemChrome : undefined;
+const executablePath = [
+  "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+  "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe",
+  "/usr/bin/google-chrome",
+].find((candidate) => existsSync(candidate));
 const port = Number(process.env.PLAYWRIGHT_PORT ?? "3000");
 const baseURL = `http://localhost:${port}`;
 
@@ -15,6 +18,7 @@ export default defineConfig({
   webServer: {
     command: `"${process.execPath}" node_modules/next/dist/bin/next dev "${projectRoot}" --hostname localhost --port ${port}`,
     env: {
+      NEXT_PUBLIC_BASE_PATH: "",
       NEXT_PUBLIC_SUPABASE_URL: "https://example.supabase.co",
       NEXT_PUBLIC_SUPABASE_ANON_KEY: "publishable-test-key",
       NEXT_PUBLIC_AUTH_REDIRECT_URL: baseURL,

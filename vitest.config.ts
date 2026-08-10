@@ -17,8 +17,20 @@ export default defineConfig({
     ],
     coverage: {
       provider: "v8",
-      include: ["src/lib/{services,utils}/**/*.ts", "src/lib/reports.ts"],
+      include: ["src/**/*.{ts,tsx}"],
+      exclude: [
+        "src/**/*.test.{ts,tsx}",
+        "src/test/**",
+        "src/lib/types/**",
+        "src/components/ui/icons.tsx",
+      ],
       reporter: ["text", "json-summary"],
+      thresholds: {
+        statements: 55,
+        branches: 70,
+        functions: 55,
+        lines: 55,
+      },
     },
   },
 });

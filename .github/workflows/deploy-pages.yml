@@ -1,22 +1,47 @@
-name: Deploy to GitHub Pages
+name: Quality and deploy GitHub Pages
 
 on:
   push:
-    branches: [agent/supabase-backup-offline]
+    branches: [main]
+  pull_request:
+    branches: [main]
   workflow_dispatch:
 
 permissions:
   contents: read
-  pages: write
-  id-token: write
 
 concurrency:
-  group: pages
+  group: pages-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
-  deploy:
+  quality:
     runs-on: ubuntu-latest
+    env:
+      NEXT_PUBLIC_BASE_PATH: /dewu-
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run audit
+      - run: npm run typecheck
+      - run: npm run lint
+      - run: npm run test:coverage -- --run
+      - run: npm run pages:check
+      - run: npx playwright install --with-deps chromium
+      - run: npm run e2e:all
+
+  deploy:
+    if: github.event_name != 'pull_request'
+    needs: quality
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
@@ -31,9 +56,8 @@ jobs:
       - name: Configure GitHub Pages
         uses: actions/configure-pages@v5
       - run: npm ci
-      - run: npm run typecheck
-      - run: npm run test:ci
-      - run: npm run build
+      - name: Build static application
+        run: npm run build
         env:
           NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
           NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}

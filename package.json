@@ -5,20 +5,27 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
+    "pages:check": "node scripts/check-pages-build.mjs",
     "start": "next start",
     "lint": "eslint src e2e",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "next typegen && tsc --noEmit",
     "test": "vitest",
     "test:ci": "vitest run",
     "test:coverage": "vitest --coverage",
     "verify:export": "node scripts/verify-export-paths.mjs",
-    "e2e": "playwright test"
+    "e2e": "playwright test",
+    "e2e:configuration": "playwright test --config playwright.configuration.config.ts",
+    "e2e:all": "npm run e2e && npm run e2e:configuration",
+    "audit": "npm audit --audit-level=high"
+  },
+  "engines": {
+    "node": ">=22 <27"
   },
   "dependencies": {
-    "@supabase/supabase-js": "^2.111.0",
-    "next": "16.2.12",
-    "react": "19.2.4",
-    "react-dom": "19.2.4",
+    "@supabase/supabase-js": "^2.112.2",
+    "next": "16.3.0",
+    "react": "19.2.8",
+    "react-dom": "19.2.8",
     "tesseract.js": "^7.0.0"
   },
   "devDependencies": {
@@ -26,13 +33,13 @@
     "@tailwindcss/postcss": "^4",
     "@testing-library/jest-dom": "6.9.1",
     "@testing-library/react": "^16.3.0",
-    "@testing-library/user-event": "^14.6.1",
+    "@testing-library/user-event": "^14.6.3",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "@vitest/coverage-v8": "^3.2.4",
     "eslint": "^9",
-    "eslint-config-next": "16.2.12",
+    "eslint-config-next": "16.3.0",
     "jsdom": "^26.1.0",
     "tailwindcss": "^4",
     "typescript": "^5",
