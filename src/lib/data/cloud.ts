@@ -27,9 +27,20 @@ function unwrap<T>(data: T | null, error: QueryError): T {
   return data;
 }
 
+function unwrapVoid(error: QueryError): void {
+  if (error) throw new DataAccessError(error.message, error.code !== "42501");
+}
+
 async function request<T>(query: PromiseLike<QueryResponse<T>>): Promise<T> {
   const response = await withDataTimeout(query);
   return unwrap(response.data, response.error);
+}
+
+async function requestVoid(
+  query: PromiseLike<QueryResponse<unknown>>,
+): Promise<void> {
+  const response = await withDataTimeout(query);
+  unwrapVoid(response.error);
 }
 
 /** Create the authenticated Supabase data adapter. */
@@ -40,6 +51,13 @@ export function createSupabaseAdapter(): DbAdapter {
     params: Record<string, unknown>,
   ): Promise<T> =>
     request<T>(client.rpc(name, params) as PromiseLike<QueryResponse<T>>);
+  const rpcVoid = async (
+    name: string,
+    params: Record<string, unknown>,
+  ): Promise<void> =>
+    requestVoid(
+      client.rpc(name, params) as PromiseLike<QueryResponse<unknown>>,
+    );
 
   async function removePending<T extends ClearResult | DeleteResult>(
     result: T,
@@ -49,7 +67,7 @@ export function createSupabaseAdapter(): DbAdapter {
       client.storage.from(BUCKET).remove(result.pendingStoragePaths),
     );
     if (!removal.error) {
-      await rpc("ack_storage_deletions", {
+      await rpcVoid("ack_storage_deletions", {
         p_paths: result.pendingStoragePaths,
       });
     }
@@ -162,21 +180,21 @@ export function createSupabaseAdapter(): DbAdapter {
         p_overwrite_confirmed: input.overwriteConfirmed,
       }),
     async settleUnits(input) {
-      await rpc("settle_units", {
+      await rpcVoid("settle_units", {
         p_unit_ids: input.unitIds,
         p_actual_payout_cents: input.actualPayoutCents,
         p_settled_at: input.settledAt,
       });
     },
     async changeStatus(input) {
-      await rpc("change_units_status", {
+      await rpcVoid("change_units_status", {
         p_unit_ids: input.unitIds,
         p_to_status: input.toStatus,
         p_note: input.note ?? null,
       });
     },
     async refundUnit(input) {
-      await rpc("refund_unit", {
+      await rpcVoid("refund_unit", {
         p_unit_id: input.unitId,
         p_note: input.note ?? null,
       });
@@ -219,7 +237,7 @@ export function createSupabaseAdapter(): DbAdapter {
           failedPaths: paths,
         };
       }
-      await rpc("ack_storage_deletions", { p_paths: paths });
+      await rpcVoid("ack_storage_deletions", { p_paths: paths });
       return {
         attempted: paths.length,
         completed: paths.length,

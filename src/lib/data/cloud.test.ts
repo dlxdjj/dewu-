@@ -91,3 +91,50 @@ describe("Supabase attachment reconciliation", () => {
     expect(remove).not.toHaveBeenCalled();
   });
 });
+
+describe("Supabase void RPC responses", () => {
+  beforeEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it("accepts a null payload when a void RPC succeeds", async () => {
+    const client = {
+      rpc: vi.fn().mockResolvedValue({ data: null, error: null }),
+    };
+    getSupabaseMock.mockReturnValue(client);
+    const adapter = createSupabaseAdapter();
+
+    await expect(
+      adapter.changeStatus({ unitIds: ["unit-1"], toStatus: "shipping" }),
+    ).resolves.toBeUndefined();
+    await expect(
+      adapter.settleUnits({
+        unitIds: ["unit-1"],
+        actualPayoutCents: 12000,
+        settledAt: "2026-08-10",
+      }),
+    ).resolves.toBeUndefined();
+    await expect(
+      adapter.refundUnit({ unitId: "unit-1" }),
+    ).resolves.toBeUndefined();
+
+    expect(client.rpc).toHaveBeenCalledTimes(3);
+  });
+
+  it("still surfaces errors from a void RPC", async () => {
+    const client = {
+      rpc: vi.fn().mockResolvedValue({
+        data: null,
+        error: { message: "status failed", code: "22000" },
+      }),
+    };
+    getSupabaseMock.mockReturnValue(client);
+
+    await expect(
+      createSupabaseAdapter().changeStatus({
+        unitIds: ["unit-1"],
+        toStatus: "shipping",
+      }),
+    ).rejects.toThrow("status failed");
+  });
+});
