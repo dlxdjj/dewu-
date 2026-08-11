@@ -1,4 +1,5 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { describe, expect, it } from "vitest";
 import { MemoryDbAdapter } from "@/lib/data/memory";
 import { makeInventorySeed } from "@/test/inventory-fixtures";
@@ -20,12 +21,17 @@ describe("InventoryGroupPage", () => {
 
     expect(await screen.findByText("数量 3 件")).toBeInTheDocument();
     expect(screen.getByText("采购成本合计 ¥330.00")).toBeInTheDocument();
-    expect(screen.getByText("淘宝 · ¥100.00 · 已到货")).toBeInTheDocument();
     expect(
-      screen.getByText("淘宝 · ¥110.00 · 发往得物途中"),
+      screen.getByText("第 1 件 · 淘宝 · 进价 ¥100.00"),
     ).toBeInTheDocument();
-    expect(screen.getByText("拼多多 · ¥120.00 · 未到货")).toBeInTheDocument();
-    expect(screen.getAllByRole("link", { name: "查看单件" })).toHaveLength(3);
+    expect(
+      screen.getByText("第 2 件 · 淘宝 · 进价 ¥110.00"),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText("第 3 件 · 拼多多 · 进价 ¥120.00"),
+    ).toBeInTheDocument();
+    expect(screen.getByText("发往得物途中 · 寄出运费 ¥0.00")).toBeInTheDocument();
+    expect(screen.getAllByRole("link", { name: "查看详情" })).toHaveLength(3);
   });
 
   it("honors the optional platform scope in a group link", async () => {
@@ -42,7 +48,58 @@ describe("InventoryGroupPage", () => {
     );
 
     expect(await screen.findByText("数量 1 件")).toBeInTheDocument();
-    expect(screen.getByText("拼多多 · ¥120.00 · 未到货")).toBeInTheDocument();
-    expect(screen.queryByText("淘宝 · ¥100.00 · 已到货")).not.toBeInTheDocument();
+    expect(
+      screen.getByText("第 1 件 · 拼多多 · 进价 ¥120.00"),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByText("第 1 件 · 淘宝 · 进价 ¥100.00"),
+    ).not.toBeInTheDocument();
+  });
+
+  it("settles all sold units in the same group without opening each detail", async () => {
+    const db = new MemoryDbAdapter();
+    const purchase = await db.createPurchase({
+      productName: "同款鞋",
+      styleCode: "GROUP-SOLD",
+      platform: "taobao",
+      unitPriceCents: 9000,
+      quantity: 2,
+      purchasedAt: "2026-08-11",
+      size: "41",
+      initialStatus: "arrived",
+      orderNo: "",
+      note: "",
+    });
+    await db.changeStatus({ unitIds: purchase.unitIds, toStatus: "sold" });
+    render(
+      <InventoryGroupPage
+        dataSource={db}
+        initialQuery={{
+          styleCode: "GROUP-SOLD",
+          productId: null,
+          size: "41",
+          platform: null,
+        }}
+      />,
+    );
+
+    await userEvent.click(
+      await screen.findByRole("button", {
+        name: "批量录到手价 · 2 件待结算",
+      }),
+    );
+    expect(screen.getAllByRole("button", { name: "录到手价" })).toHaveLength(
+      2,
+    );
+    await userEvent.type(screen.getByLabelText("实际到手价"), "130");
+    await userEvent.click(
+      screen.getByRole("button", { name: "确认到手价并结算" }),
+    );
+
+    await waitFor(() =>
+      expect(db.snapshot().units.every((unit) => unit.status === "settled"))
+        .toBe(true),
+    );
+    expect(await screen.findAllByText("修改到手价")).toHaveLength(2);
   });
 });

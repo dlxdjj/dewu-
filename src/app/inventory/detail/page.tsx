@@ -97,11 +97,23 @@ function Detail() {
       return;
     }
     if (to === "shipping") {
+      if (
+        (unit.status === "sold" || unit.status === "settled") &&
+        !window.confirm("重新寄出会删除已有的销售和利润记录，确认继续？")
+      ) {
+        return;
+      }
       setShipping(true);
       return;
     }
     if (to === "refunded") {
       setRefund(true);
+      return;
+    }
+    if (
+      (unit.status === "sold" || unit.status === "settled") &&
+      !window.confirm("修改销售状态会删除或重置已有的销售和利润记录，确认继续？")
+    ) {
       return;
     }
     setBusy(true);

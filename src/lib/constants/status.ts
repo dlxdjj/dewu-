@@ -25,6 +25,7 @@ export const PURCHASE_INITIAL_STATUSES = [
 export const BATCH_STATUS_TARGETS = [
   "pending",
   "arrived",
+  "shipping",
   "in_stock_dewu",
   "sold",
   "returned",
@@ -58,15 +59,11 @@ export const ACTIVE_STATUSES: UnitStatus[] = [
   "returned",
 ];
 
-/** 库存页筛选分组 */
-export const STATUS_FILTER_GROUPS: { label: string; statuses: UnitStatus[] }[] = [
-  { label: "未到货", statuses: ["pending"] },
-  { label: "现货", statuses: ["arrived"] },
-  { label: "发往得物", statuses: ["shipping"] },
-  { label: "得物仓未售", statuses: ["in_stock_dewu"] },
-  { label: "已售", statuses: ["sold", "settled"] },
-  { label: "退回/退款", statuses: ["returned", "refunded"] },
-];
+/** 库存页按精确状态筛选，避免把待结算和已结算混在一起。 */
+export const STATUS_FILTER_OPTIONS = UNIT_STATUSES.map((status) => ({
+  status,
+  label: STATUS_META[status].label,
+}));
 
 /** 滞留提醒规则（首页待办用） */
 export const STALE_RULES: { status: UnitStatus; days: number; hint: string }[] = [

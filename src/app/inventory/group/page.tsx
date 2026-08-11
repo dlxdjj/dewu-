@@ -4,7 +4,12 @@ import { Suspense, useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import Card from "@/components/ui/Card";
-import { PLATFORM_LABELS, PLATFORMS, type Platform } from "@/lib/constants/platform";
+import SaleFormSheet from "@/components/ui/SaleFormSheet";
+import {
+  PLATFORM_LABELS,
+  PLATFORMS,
+  type Platform,
+} from "@/lib/constants/platform";
 import { STATUS_META } from "@/lib/constants/status";
 import { getDb } from "@/lib/data";
 import type { DbAdapter } from "@/lib/data/types";
@@ -60,6 +65,10 @@ function GroupContent({
   const [units, setUnits] = useState<UnitJoined[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [settlementUnits, setSettlementUnits] = useState<UnitJoined[] | null>(
+    null,
+  );
+  const [refresh, setRefresh] = useState(0);
   const resolveDb = useCallback(
     (): DbAdapter => dataSource ?? getDb(),
     [dataSource],
@@ -77,6 +86,7 @@ function GroupContent({
     ])
       .then(([raw, products, batches, sales]) => {
         if (!active) return;
+        setError("");
         const productMap = new Map(
           products.map((product) => [product.id, product]),
         );
@@ -115,19 +125,27 @@ function GroupContent({
     return () => {
       active = false;
     };
-  }, [platform, productId, resolveDb, size, styleCode]);
+  }, [platform, productId, refresh, resolveDb, size, styleCode]);
 
   const totalCost = units.reduce(
     (sum, unit) => sum + unit.unit_cost_cents,
     0,
   );
+  const awaitingSettlement = units.filter((unit) => unit.status === "sold");
+
+  async function settlementDone(): Promise<void> {
+    setSettlementUnits(null);
+    setRefresh((value) => value + 1);
+  }
 
   return (
     <>
       <Link href="/inventory" className="text-tint">
         ‹ 库存
       </Link>
-      <h1 className="mt-3 text-xl font-bold">合并库存</h1>
+      <h1 className="mt-3 text-xl font-bold">
+        {units[0]?.product.name ?? "合并库存"}
+      </h1>
       <p className="mt-1 text-sm text-muted">
         {styleCode || "历史无货号"} · {size}
       </p>
@@ -136,19 +154,44 @@ function GroupContent({
         <p className="mt-1 text-sm text-muted">
           采购成本合计 {loading ? "…" : formatCents(totalCost)}
         </p>
+        {awaitingSettlement.length > 0 && (
+          <button
+            type="button"
+            onClick={() => setSettlementUnits(awaitingSettlement)}
+            className="mt-3 min-h-11 w-full rounded-xl bg-[#1B7F37] px-3 text-[15px] font-medium text-white"
+          >
+            批量录到手价 · {awaitingSettlement.length} 件待结算
+          </button>
+        )}
       </Card>
       <div className="mt-3 space-y-2">
-        {units.map((unit) => (
+        {units.map((unit, index) => (
           <div key={unit.id} className="rounded-xl bg-card p-3">
-            <p className="text-sm">
-              {PLATFORM_LABELS[unit.batch.platform]} · {formatCents(unit.unit_cost_cents)} · {STATUS_META[unit.status].label}
+            <p className="text-[15px] leading-6">
+              第 {index + 1} 件 · {PLATFORM_LABELS[unit.batch.platform]} · 进价{" "}
+              {formatCents(unit.unit_cost_cents)}
             </p>
-            <div className="mt-2 flex items-center justify-between">
+            <p className="mt-0.5 text-sm leading-5 text-muted">
+              {STATUS_META[unit.status].label} · 寄出运费{" "}
+              {formatCents(unit.outbound_shipping_cents)}
+              {unit.sale?.actual_payout_cents != null &&
+                ` · 到手 ${formatCents(unit.sale.actual_payout_cents)}`}
+            </p>
+            <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-2">
+              {(unit.status === "sold" || unit.status === "settled") && (
+                <button
+                  type="button"
+                  onClick={() => setSettlementUnits([unit])}
+                  className="min-h-11 text-[15px] font-medium text-[#1B7F37]"
+                >
+                  {unit.status === "settled" ? "修改到手价" : "录到手价"}
+                </button>
+              )}
               <Link
                 href={`/inventory/detail?id=${unit.id}`}
-                className="text-sm text-tint"
+                className="inline-flex min-h-11 items-center text-[15px] text-tint"
               >
-                查看单件
+                查看详情
               </Link>
               <button
                 type="button"
@@ -167,7 +210,7 @@ function GroupContent({
                     );
                   }
                 }}
-                className="text-sm text-danger"
+                className="ml-auto min-h-11 text-[15px] text-danger"
               >
                 删除一件
               </button>
@@ -179,6 +222,14 @@ function GroupContent({
         <p role="alert" className="mt-3 text-sm text-danger">
           {error}
         </p>
+      )}
+      {settlementUnits && (
+        <SaleFormSheet
+          units={settlementUnits}
+          dataSource={dataSource}
+          onClose={() => setSettlementUnits(null)}
+          onDone={settlementDone}
+        />
       )}
     </>
   );

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { MemoryDbAdapter } from "@/lib/data/memory";
-import { batchChangeStatus, changeUnitStatus } from "./status";
+import { batchChangeStatus, changeUnitStatus, settleUnits } from "./status";
 
 const purchaseInput = {
   productName: "测试鞋",
@@ -38,6 +38,16 @@ describe("status and sale integrity", () => {
       "录入总快递费",
     );
     expect(db.snapshot().units[0].status).toBe("arrived");
+  });
+
+  it("requires a settlement date before writing payout", async () => {
+    const db = new MemoryDbAdapter();
+    const purchase = await db.createPurchase(purchaseInput);
+
+    await expect(
+      settleUnits(db, purchase.unitIds, "100", ""),
+    ).rejects.toThrow("请选择结算日期");
+    expect(db.snapshot().sales).toHaveLength(0);
   });
 
   it("changes settled back to sold without retaining payout", async () => {

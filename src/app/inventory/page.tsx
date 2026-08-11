@@ -11,6 +11,7 @@ import { loadProductImageUrls } from "@/lib/catalog";
 import { PLATFORMS } from "@/lib/constants/platform";
 import {
   BATCH_STATUS_TARGETS,
+  STATUS_FILTER_OPTIONS,
   STATUS_META,
   type UnitStatus,
 } from "@/lib/constants/status";
@@ -22,7 +23,9 @@ import type { UnitJoined } from "@/lib/types/database";
 import {
   buildGroups,
   filterUnitsByPlatform,
+  filterUnitsByStatus,
   type PlatformFilter,
+  type StatusFilter,
   type UnitGroup,
 } from "@/lib/utils/group";
 
@@ -35,12 +38,16 @@ export default function InventoryPage({
   const [imageUrls, setImageUrls] = useState<Map<string, string>>(new Map());
   const [platformFilter, setPlatformFilter] =
     useState<PlatformFilter>("all");
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
+  const [loadError, setLoadError] = useState("");
+  const [actionError, setActionError] = useState("");
   const [selecting, setSelecting] = useState(false);
   const [selected, setSelected] = useState(new Set<string>());
   const [shipping, setShipping] = useState(false);
-  const [settling, setSettling] = useState(false);
+  const [settlementUnits, setSettlementUnits] = useState<UnitJoined[] | null>(
+    null,
+  );
   const [changingStatus, setChangingStatus] = useState(false);
   const [target, setTarget] = useState<UnitStatus>("arrived");
 
@@ -51,7 +58,7 @@ export default function InventoryPage({
 
   const load = useCallback(async () => {
     setLoading(true);
-    setError("");
+    setLoadError("");
     try {
       const db = resolveDb();
       const [raw, products, batches, sales] = await Promise.all([
@@ -86,7 +93,7 @@ export default function InventoryPage({
       setUnits(joined);
       setImageUrls(urls);
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : "加载失败");
+      setLoadError(reason instanceof Error ? reason.message : "加载失败");
     } finally {
       setLoading(false);
     }
@@ -96,7 +103,8 @@ export default function InventoryPage({
     void Promise.resolve().then(load);
   }, [load]);
 
-  const visibleUnits = filterUnitsByPlatform(units, platformFilter);
+  const platformUnits = filterUnitsByPlatform(units, platformFilter);
+  const visibleUnits = filterUnitsByStatus(platformUnits, statusFilter);
   const groups = buildGroups(visibleUnits);
   const availablePlatforms = PLATFORMS.filter((option) =>
     units.some((unit) => unit.batch.platform === option.value),
@@ -106,6 +114,13 @@ export default function InventoryPage({
   function switchPlatform(filter: PlatformFilter): void {
     setPlatformFilter(filter);
     setSelected(new Set());
+    setActionError("");
+  }
+
+  function switchStatus(filter: StatusFilter): void {
+    setStatusFilter(filter);
+    setSelected(new Set());
+    setActionError("");
   }
 
   function toggleGroup(group: UnitGroup): void {
@@ -122,15 +137,42 @@ export default function InventoryPage({
 
   async function done(): Promise<void> {
     setShipping(false);
-    setSettling(false);
+    setSettlementUnits(null);
     setSelecting(false);
     setSelected(new Set());
+    setActionError("");
     await load();
+  }
+
+  function prepareShipping(candidates: UnitJoined[]): void {
+    setActionError("");
+    if (candidates.some((unit) => unit.status === "refunded")) {
+      setActionError("选择中包含退款件，请先按状态筛选后再寄出。");
+      return;
+    }
+    if (
+      candidates.some(
+        (unit) => unit.status === "sold" || unit.status === "settled",
+      ) &&
+      !window.confirm("重新寄出会删除所选商品已有的销售和利润记录，确认继续？")
+    ) {
+      return;
+    }
+    setShipping(true);
+  }
+
+  function prepareSettlement(candidates: UnitJoined[]): void {
+    setActionError("");
+    if (candidates.some((unit) => unit.status === "refunded")) {
+      setActionError("选择中包含退款件，请先按状态筛选后再录到手价。");
+      return;
+    }
+    setSettlementUnits(candidates);
   }
 
   return (
     <>
-      <div className="flex justify-between gap-3">
+      <div className="flex items-start justify-between gap-3">
         <PageHeader
           title="库存"
           subtitle={
@@ -142,6 +184,7 @@ export default function InventoryPage({
           onClick={() => {
             setSelecting((value) => !value);
             setSelected(new Set());
+            setActionError("");
           }}
           className="min-h-11 shrink-0 rounded-full bg-card px-4 text-[15px]"
         >
@@ -150,40 +193,84 @@ export default function InventoryPage({
       </div>
 
       {!loading && units.length > 0 && (
-        <div className="mb-3 flex gap-2 overflow-x-auto pb-1">
-          <button
-            type="button"
-            aria-pressed={platformFilter === "all"}
-            onClick={() => switchPlatform("all")}
-            className={`min-h-11 shrink-0 rounded-full px-4 py-2 text-[15px] ${
-              platformFilter === "all"
-                ? "bg-label text-card"
-                : "bg-card text-label"
-            }`}
+        <div className="mb-3 space-y-2.5">
+          <div
+            aria-label="按采购平台筛选"
+            className="no-scrollbar flex gap-2 overflow-x-auto pb-1"
           >
-            全部
-          </button>
-          {availablePlatforms.map((option) => (
             <button
-              key={option.value}
               type="button"
-              aria-pressed={platformFilter === option.value}
-              onClick={() => switchPlatform(option.value)}
+              aria-pressed={platformFilter === "all"}
+              onClick={() => switchPlatform("all")}
               className={`min-h-11 shrink-0 rounded-full px-4 py-2 text-[15px] ${
-                platformFilter === option.value
+                platformFilter === "all"
                   ? "bg-label text-card"
                   : "bg-card text-label"
               }`}
             >
-              {option.label}
+              全部平台
             </button>
-          ))}
+            {availablePlatforms.map((option) => (
+              <button
+                key={option.value}
+                type="button"
+                aria-pressed={platformFilter === option.value}
+                onClick={() => switchPlatform(option.value)}
+                className={`min-h-11 shrink-0 rounded-full px-4 py-2 text-[15px] ${
+                  platformFilter === option.value
+                    ? "bg-label text-card"
+                    : "bg-card text-label"
+                }`}
+              >
+                {option.label}
+              </button>
+            ))}
+          </div>
+          <div
+            aria-label="按库存状态筛选"
+            className="no-scrollbar flex gap-2 overflow-x-auto pb-1"
+          >
+            <button
+              type="button"
+              aria-label="全部状态"
+              aria-pressed={statusFilter === "all"}
+              onClick={() => switchStatus("all")}
+              className={`min-h-11 shrink-0 rounded-full px-4 py-2 text-[15px] ${
+                statusFilter === "all"
+                  ? "bg-tint text-white"
+                  : "bg-card text-label"
+              }`}
+            >
+              全部状态 {platformUnits.length}
+            </button>
+            {STATUS_FILTER_OPTIONS.map((option) => (
+              <button
+                key={option.status}
+                type="button"
+                aria-label={option.label}
+                aria-pressed={statusFilter === option.status}
+                onClick={() => switchStatus(option.status)}
+                className={`min-h-11 shrink-0 rounded-full px-4 py-2 text-[15px] ${
+                  statusFilter === option.status
+                    ? "bg-tint text-white"
+                    : "bg-card text-label"
+                }`}
+              >
+                {option.label}{" "}
+                {
+                  platformUnits.filter(
+                    (unit) => unit.status === option.status,
+                  ).length
+                }
+              </button>
+            ))}
+          </div>
         </div>
       )}
 
-      {error ? (
+      {loadError ? (
         <Card>
-          <p role="alert" className="text-sm text-danger">{error}</p>
+          <p role="alert" className="text-sm text-danger">{loadError}</p>
           <button type="button" onClick={load} className="mt-2 text-sm text-tint">
             重试
           </button>
@@ -196,7 +283,10 @@ export default function InventoryPage({
         </Card>
       ) : groups.length === 0 ? (
         <Card>
-          <EmptyState title="该平台暂无库存" subtitle="请选择其他购入平台" />
+          <EmptyState
+            title="当前分类暂无商品"
+            subtitle="请选择其他平台或状态"
+          />
         </Card>
       ) : (
         <div className="grid min-w-0 gap-3 md:grid-cols-2">
@@ -209,66 +299,107 @@ export default function InventoryPage({
               selectable={selecting}
               selected={group.units.every((unit) => selected.has(unit.id))}
               onToggle={() => toggleGroup(group)}
+              onSettle={prepareSettlement}
             />
           ))}
         </div>
       )}
 
       {selecting && (
-        <div className="fixed inset-x-0 bottom-[calc(56px+env(safe-area-inset-bottom))] z-40 border-t border-separator bg-card p-3">
-          <div className="mx-auto flex max-w-3xl flex-wrap gap-2">
-            <span className="w-full text-center text-sm text-muted">
-              已选 {selected.size} 件
-            </span>
-            <button
-              type="button"
-              disabled={!selected.size}
-              onClick={() => setShipping(true)}
-              className="min-h-11 flex-1 rounded-xl bg-tint py-2.5 text-[15px] text-white disabled:opacity-40"
-            >
-              批量寄出
-            </button>
-            <button
-              type="button"
-              disabled={!selected.size}
-              onClick={() => setSettling(true)}
-              className="min-h-11 flex-1 rounded-xl bg-[#1B7F37] py-2.5 text-[15px] text-white disabled:opacity-40"
-            >
-              录到手价
-            </button>
-            <select
-              aria-label="目标状态"
-              value={target}
-              onChange={(event) => setTarget(event.target.value as UnitStatus)}
-              className="min-h-11 min-w-0 flex-1 rounded-xl bg-background px-2 text-[15px]"
-            >
-              {BATCH_STATUS_TARGETS.map((status) => (
-                <option key={status} value={status}>
-                  {STATUS_META[status].label}
-                </option>
-              ))}
-            </select>
-            <button
-              type="button"
-              disabled={!selected.size || changingStatus}
-              onClick={async () => {
-                setChangingStatus(true);
-                setError("");
-                try {
-                  await batchChangeStatus(resolveDb(), chosen, target);
-                  await done();
-                } catch (reason) {
-                  setError(reason instanceof Error ? reason.message : "状态修改失败");
-                } finally {
-                  setChangingStatus(false);
-                }
-              }}
-              className="min-h-11 rounded-xl bg-label px-4 py-2.5 text-[15px] text-white disabled:opacity-40"
-            >
-              {changingStatus ? "处理中…" : "改状态"}
-            </button>
+        <>
+          <div aria-hidden="true" className="h-24" />
+          <div className="fixed inset-x-0 bottom-[calc(56px+env(safe-area-inset-bottom))] z-40 border-t border-separator bg-card p-3">
+            <div className="mx-auto flex max-w-3xl flex-col gap-2">
+              <span className="w-full text-center text-sm text-muted">
+                已选 {selected.size} 件
+              </span>
+              {actionError && (
+                <p
+                  role="alert"
+                  className="rounded-lg bg-danger/10 px-3 py-2 text-sm text-danger"
+                >
+                  {actionError}
+                </p>
+              )}
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  disabled={!selected.size}
+                  onClick={() => prepareShipping(chosen)}
+                  className="min-h-11 rounded-xl bg-tint px-3 py-2.5 text-[15px] text-white disabled:opacity-40"
+                >
+                  批量寄出
+                </button>
+                <button
+                  type="button"
+                  disabled={!selected.size}
+                  onClick={() => prepareSettlement(chosen)}
+                  className="min-h-11 rounded-xl bg-[#1B7F37] px-3 py-2.5 text-[15px] text-white disabled:opacity-40"
+                >
+                  批量录到手价
+                </button>
+              </div>
+              <div className="flex gap-2">
+                <select
+                  aria-label="目标状态"
+                  value={target}
+                  onChange={(event) =>
+                    setTarget(event.target.value as UnitStatus)
+                  }
+                  className="min-h-11 min-w-0 flex-1 rounded-xl bg-background px-3 text-[15px]"
+                >
+                  {BATCH_STATUS_TARGETS.map((status) => (
+                    <option key={status} value={status}>
+                      {STATUS_META[status].label}
+                    </option>
+                  ))}
+                </select>
+                <button
+                  type="button"
+                  disabled={!selected.size || changingStatus}
+                  onClick={async () => {
+                    if (target === "shipping") {
+                      prepareShipping(chosen);
+                      return;
+                    }
+                    if (
+                      chosen.some(
+                        (unit) =>
+                          unit.status === "sold" || unit.status === "settled",
+                      ) &&
+                      !window.confirm(
+                        "修改销售状态会删除或重置已有的销售和利润记录，确认继续？",
+                      )
+                    ) {
+                      return;
+                    }
+                    setChangingStatus(true);
+                    setActionError("");
+                    try {
+                      await batchChangeStatus(resolveDb(), chosen, target);
+                      await done();
+                    } catch (reason) {
+                      setActionError(
+                        reason instanceof Error
+                          ? reason.message
+                          : "状态修改失败",
+                      );
+                    } finally {
+                      setChangingStatus(false);
+                    }
+                  }}
+                  className="min-h-11 shrink-0 rounded-xl bg-label px-5 py-2.5 text-[15px] text-white disabled:opacity-40"
+                >
+                  {changingStatus
+                    ? "处理中…"
+                    : target === "shipping"
+                      ? "填写运费"
+                      : "修改状态"}
+                </button>
+              </div>
+            </div>
           </div>
-        </div>
+        </>
       )}
 
       {shipping && (
@@ -285,10 +416,11 @@ export default function InventoryPage({
           }}
         />
       )}
-      {settling && (
+      {settlementUnits && (
         <SaleFormSheet
-          units={chosen}
-          onClose={() => setSettling(false)}
+          units={settlementUnits}
+          dataSource={dataSource}
+          onClose={() => setSettlementUnits(null)}
           onDone={done}
         />
       )}

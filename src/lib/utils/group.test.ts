@@ -3,6 +3,7 @@ import { makeJoinedUnit } from "@/test/inventory-fixtures";
 import {
   buildGroups,
   filterUnitsByPlatform,
+  filterUnitsByStatus,
   groupQuery,
   matchesGroup,
 } from "./group";
@@ -66,6 +67,19 @@ describe("inventory grouping", () => {
     ]);
 
     expect(groups).toHaveLength(2);
+  });
+
+  it("filters exact statuses before grouping", () => {
+    const units = [
+      makeJoinedUnit({ id: "u1", status: "sold" }),
+      makeJoinedUnit({ id: "u2", status: "settled" }),
+      makeJoinedUnit({ id: "u3", status: "shipping" }),
+    ];
+
+    expect(filterUnitsByStatus(units, "sold").map((unit) => unit.id)).toEqual([
+      "u1",
+    ]);
+    expect(filterUnitsByStatus(units, "all")).toEqual(units);
   });
 
   it("keeps different sizes in different groups", () => {

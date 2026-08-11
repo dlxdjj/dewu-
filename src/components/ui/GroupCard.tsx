@@ -18,6 +18,7 @@ export default function GroupCard({
   selectable,
   selected,
   onToggle,
+  onSettle,
 }: {
   group: UnitGroup;
   imageUrl: string | null;
@@ -25,6 +26,7 @@ export default function GroupCard({
   selectable: boolean;
   selected: boolean;
   onToggle: () => void;
+  onSettle?: (units: UnitGroup["units"]) => void;
 }) {
   const statuses = UNIT_STATUSES.flatMap((status) => {
     const count = group.statusCounts[status] ?? 0;
@@ -33,6 +35,7 @@ export default function GroupCard({
   const platformText = group.platforms
     .map((platform) => PLATFORM_LABELS[platform])
     .join(" · ");
+  const settlementUnits = group.units.filter((unit) => unit.status === "sold");
   const className = `flex min-w-0 w-full max-w-full gap-3 overflow-hidden rounded-2xl bg-card p-4 text-left shadow-[0_1px_2px_rgba(0,0,0,0.05)] active:bg-background ${
     selected ? "ring-2 ring-tint" : ""
   }`;
@@ -106,11 +109,24 @@ export default function GroupCard({
   }
 
   return (
-    <Link
-      href={`/inventory/group?${groupQuery(group, platformFilter)}`}
-      className={className}
-    >
-      {content}
-    </Link>
+    <article className="min-w-0 overflow-hidden rounded-2xl bg-card shadow-[0_1px_2px_rgba(0,0,0,0.05)]">
+      <Link
+        href={`/inventory/group?${groupQuery(group, platformFilter)}`}
+        className="flex min-w-0 w-full max-w-full gap-3 overflow-hidden p-4 text-left active:bg-background"
+      >
+        {content}
+      </Link>
+      {settlementUnits.length > 0 && onSettle && (
+        <div className="border-t border-separator px-3 py-2.5">
+          <button
+            type="button"
+            onClick={() => onSettle(settlementUnits)}
+            className="min-h-11 w-full rounded-xl bg-[#E8F3EA] px-3 text-[15px] font-medium text-[#1B7F37]"
+          >
+            录到手价 · {settlementUnits.length} 件待结算
+          </button>
+        </div>
+      )}
+    </article>
   );
 }

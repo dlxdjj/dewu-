@@ -7,6 +7,7 @@ import type { UnitStatus } from "@/lib/constants/status";
 import type { UnitJoined } from "@/lib/types/database";
 
 export type PlatformFilter = Platform | "all";
+export type StatusFilter = UnitStatus | "all";
 
 export interface UnitGroup {
   key: string;
@@ -48,6 +49,15 @@ export function filterUnitsByPlatform(
   return filter === "all"
     ? units
     : units.filter((unit) => unit.batch.platform === filter);
+}
+
+export function filterUnitsByStatus(
+  units: UnitJoined[],
+  filter: StatusFilter,
+): UnitJoined[] {
+  return filter === "all"
+    ? units
+    : units.filter((unit) => unit.status === filter);
 }
 
 export function buildGroups(units: UnitJoined[]): UnitGroup[] {

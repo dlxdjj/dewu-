@@ -74,4 +74,28 @@ describe("GroupCard", () => {
     expect(onToggle).toHaveBeenCalledTimes(1);
     expect(screen.queryByRole("link")).not.toBeInTheDocument();
   });
+
+  it("offers one-tap settlement for every sold unit in the group", async () => {
+    const soldGroup = buildGroups([
+      makeJoinedUnit({ id: "s1", status: "sold" }),
+      makeJoinedUnit({ id: "s2", status: "sold" }),
+    ])[0];
+    const onSettle = vi.fn();
+    render(
+      <GroupCard
+        group={soldGroup}
+        imageUrl={null}
+        platformFilter="all"
+        selectable={false}
+        selected={false}
+        onToggle={vi.fn()}
+        onSettle={onSettle}
+      />,
+    );
+
+    await userEvent.click(
+      screen.getByRole("button", { name: "录到手价 · 2 件待结算" }),
+    );
+    expect(onSettle).toHaveBeenCalledWith(soldGroup.units);
+  });
 });

@@ -21,6 +21,7 @@ export async function batchChangeStatus(db: DbAdapter, units: InventoryUnit[], t
 }
 export async function settleUnits(db: DbAdapter, unitIds: string[], payoutYuan: string, settledAt: string): Promise<void> {
   if (unitIds.length < 1) throw new Error("至少选择一件商品");
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(settledAt)) throw new Error("请选择结算日期");
   await db.settleUnits({ unitIds, actualPayoutCents: parseYuanToCents(payoutYuan), settledAt });
 }
 export async function refundUnit(db: DbAdapter, unitId: string, note?: string): Promise<void> { await db.refundUnit({ unitId, note }); }
