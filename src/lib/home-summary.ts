@@ -1,5 +1,5 @@
 import { ACTIVE_STATUSES } from "@/lib/constants/status";
-import type { InventoryUnit, Sale } from "@/lib/types/database";
+import type { InventoryUnit, MonthlyRebate, Sale } from "@/lib/types/database";
 import { monthKey } from "@/lib/utils/format";
 import { actualProfitCents } from "@/lib/utils/profit";
 
@@ -9,12 +9,14 @@ export interface HomeSummary {
   month: string;
   monthLabel: string;
   monthlySalesCount: number;
+  monthlyRebateCents: number;
   monthlyProfitCents: number;
 }
 
 export function buildHomeSummary(
   units: InventoryUnit[],
   sales: Sale[],
+  rebates: MonthlyRebate[],
   now: Date,
 ): HomeSummary {
   const month = monthKey(now);
@@ -39,6 +41,9 @@ export function buildHomeSummary(
   const active = validUnits.filter((unit) =>
     ACTIVE_STATUSES.includes(unit.status),
   );
+  const monthlyRebateCents = rebates
+    .filter((rebate) => rebate.month.startsWith(month))
+    .reduce((sum, rebate) => sum + rebate.amount_cents, 0);
 
   return {
     inventoryCount: active.length,
@@ -49,6 +54,8 @@ export function buildHomeSummary(
     month,
     monthLabel: `${Number(month.slice(5))}月`,
     monthlySalesCount: settled.length,
-    monthlyProfitCents: settled.reduce((sum, row) => sum + row.profit, 0),
+    monthlyRebateCents,
+    monthlyProfitCents:
+      settled.reduce((sum, row) => sum + row.profit, 0) + monthlyRebateCents,
   };
 }

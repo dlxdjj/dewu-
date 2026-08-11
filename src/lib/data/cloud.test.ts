@@ -9,7 +9,7 @@ vi.mock("@/lib/supabase/client", () => ({
 }));
 
 import { createSupabaseAdapter } from "./cloud";
-import type { Attachment } from "@/lib/types/database";
+import type { Attachment, MonthlyRebate } from "@/lib/types/database";
 
 function createClient(lookupRows: Attachment[]) {
   const upload = vi.fn().mockResolvedValue({ data: { path: "uploaded" }, error: null });
@@ -136,5 +136,69 @@ describe("Supabase void RPC responses", () => {
         toStatus: "shipping",
       }),
     ).rejects.toThrow("status failed");
+  });
+});
+
+describe("Supabase monthly rebates", () => {
+  beforeEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it("saves both sources through one atomic RPC", async () => {
+    const rows: MonthlyRebate[] = [
+      {
+        id: "rebate-1",
+        user_id: "user-1",
+        month: "2026-08-01",
+        source: "taobao_alliance",
+        amount_cents: 1000,
+        created_at: "2026-08-10T00:00:00Z",
+        updated_at: "2026-08-10T00:00:00Z",
+      },
+      {
+        id: "rebate-2",
+        user_id: "user-1",
+        month: "2026-08-01",
+        source: "jingfen",
+        amount_cents: 2000,
+        created_at: "2026-08-10T00:00:00Z",
+        updated_at: "2026-08-10T00:00:00Z",
+      },
+    ];
+    const client = {
+      rpc: vi.fn().mockResolvedValue({ data: rows, error: null }),
+    };
+    getSupabaseMock.mockReturnValue(client);
+
+    await expect(
+      createSupabaseAdapter().saveMonthlyRebates({
+        month: "2026-08-01",
+        taobaoAllianceCents: 1000,
+        jingfenCents: 2000,
+      }),
+    ).resolves.toEqual(rows);
+    expect(client.rpc).toHaveBeenCalledWith("save_monthly_rebates", {
+      p_month: "2026-08-01",
+      p_taobao_alliance_cents: 1000,
+      p_jingfen_cents: 2000,
+    });
+  });
+
+  it("keeps pages readable before migration 0005 is applied", async () => {
+    const query = {
+      select: vi.fn(),
+      order: vi.fn(),
+    };
+    query.select.mockReturnValue(query);
+    query.order.mockResolvedValue({
+      data: null,
+      error: { message: "relation does not exist", code: "42P01" },
+    });
+    const client = {
+      from: vi.fn().mockReturnValue(query),
+    };
+    getSupabaseMock.mockReturnValue(client);
+
+    await expect(createSupabaseAdapter().listRebates()).resolves.toEqual([]);
   });
 });

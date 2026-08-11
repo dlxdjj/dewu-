@@ -97,7 +97,7 @@ export default function SettingsPage() {
         <Card className="border border-danger/30 md:col-span-2">
           <h2 className="font-medium text-danger">清空全部数据</h2>
           <p className="mt-1 text-xs leading-5 text-muted">
-            删除当前账户的商品、批次、单件、销售、历史和附件元数据。此操作无法撤销。
+            删除当前账户的商品、批次、单件、销售、返利、历史和附件元数据。此操作无法撤销。
           </p>
           <label className="mt-3 block text-sm">
             确认词（必填）

@@ -2,7 +2,7 @@
 
 import { STATUS_META, UNIT_STATUSES, type UnitStatus } from "@/lib/constants/status";
 
-/** 状态直达选择器：当前状态高亮，点其他状态直接变更 */
+/** 状态选择器：当前状态高亮，特殊状态由页面打开对应表单。 */
 export default function StatusChips({
   current,
   onSelect,

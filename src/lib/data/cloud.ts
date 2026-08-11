@@ -9,6 +9,7 @@ import type {
 import type {
   Attachment,
   InventoryUnit,
+  MonthlyRebate,
   Product,
   PurchaseBatch,
   Sale,
@@ -105,6 +106,21 @@ export function createSupabaseAdapter(): DbAdapter {
       request<Sale[]>(
         client.from("sales").select("*") as PromiseLike<QueryResponse<Sale[]>>,
       ),
+    async listRebates() {
+      const response = await withDataTimeout(
+        client
+          .from("monthly_rebates")
+          .select("*")
+          .order("month", { ascending: false }) as PromiseLike<
+          QueryResponse<MonthlyRebate[]>
+        >,
+      );
+      // Keep existing deployments readable while 0005 is being applied.
+      if (["42P01", "PGRST205"].includes(response.error?.code ?? "")) {
+        return [];
+      }
+      return unwrap(response.data, response.error);
+    },
     listHistory: (unitId) => {
       let query = client
         .from("status_history")
@@ -199,6 +215,12 @@ export function createSupabaseAdapter(): DbAdapter {
         p_note: input.note ?? null,
       });
     },
+    saveMonthlyRebates: (input) =>
+      rpc<MonthlyRebate[]>("save_monthly_rebates", {
+        p_month: input.month,
+        p_taobao_alliance_cents: input.taobaoAllianceCents,
+        p_jingfen_cents: input.jingfenCents,
+      }),
     async deleteUnitDeep(input) {
       return removePending(
         await rpc<DeleteResult>("delete_unit_deep", {

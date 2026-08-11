@@ -4,6 +4,7 @@ import { Suspense, useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import Card from "@/components/ui/Card";
+import BatchShippingSheet from "@/components/ui/BatchShippingSheet";
 import StatusChips from "@/components/ui/StatusChips";
 import SaleFormSheet from "@/components/ui/SaleFormSheet";
 import DeleteUnitSheet from "@/components/ui/DeleteUnitSheet";
@@ -11,6 +12,7 @@ import Sheet from "@/components/ui/Sheet";
 import { getDb } from "@/lib/data";
 import { changeUnitStatus, refundUnit } from "@/lib/services/status";
 import { deleteUnitDeep } from "@/lib/services/maintenance";
+import { shipUnits } from "@/lib/services/shipping";
 import { formatCents, formatSignedCents } from "@/lib/utils/money";
 import { unitProfit } from "@/lib/utils/profit";
 import type { UnitJoined } from "@/lib/types/database";
@@ -39,6 +41,7 @@ function Detail() {
   const [unit, setUnit] = useState<UnitJoined | null>(null);
   const [error, setError] = useState("");
   const [sale, setSale] = useState(false);
+  const [shipping, setShipping] = useState(false);
   const [refund, setRefund] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -93,6 +96,10 @@ function Detail() {
       setSale(true);
       return;
     }
+    if (to === "shipping") {
+      setShipping(true);
+      return;
+    }
     if (to === "refunded") {
       setRefund(true);
       return;
@@ -133,7 +140,9 @@ function Detail() {
         />
         <Row label="实际利润" value={formatSignedCents(profit.value)} />
       </Card>
-      <p className="mb-2 mt-5 text-sm text-muted">状态任意直达</p>
+      <p className="mb-2 mt-5 text-sm text-muted">
+        选择寄出时会先录入本件运费
+      </p>
       <Card>
         <StatusChips current={unit.status} onSelect={select} />
         {busy && <p className="mt-2 text-center text-xs text-muted">处理中…</p>}
@@ -163,6 +172,21 @@ function Detail() {
           onClose={() => setSale(false)}
           onDone={async () => {
             setSale(false);
+            await load();
+          }}
+        />
+      )}
+      {shipping && (
+        <BatchShippingSheet
+          units={[unit]}
+          onClose={() => setShipping(false)}
+          onConfirm={async (totalShippingCents, overwriteConfirmed) => {
+            await shipUnits(getDb(), {
+              unitIds: [unit.id],
+              totalShippingCents,
+              overwriteConfirmed,
+            });
+            setShipping(false);
             await load();
           }}
         />

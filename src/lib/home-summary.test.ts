@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { UnitStatus } from "@/lib/constants/status";
-import type { InventoryUnit, Sale } from "@/lib/types/database";
+import type { InventoryUnit, MonthlyRebate, Sale } from "@/lib/types/database";
 import { buildHomeSummary } from "./home-summary";
 
 const timestamp = "2026-08-01T00:00:00Z";
@@ -44,6 +44,22 @@ function sale(unitId: string, payout: number, settledAt: string): Sale {
   };
 }
 
+function rebate(
+  source: MonthlyRebate["source"],
+  amountCents: number,
+  month: string,
+): MonthlyRebate {
+  return {
+    id: `r-${source}-${month}`,
+    user_id: "u1",
+    month: `${month}-01`,
+    source,
+    amount_cents: amountCents,
+    created_at: timestamp,
+    updated_at: timestamp,
+  };
+}
+
 describe("buildHomeSummary", () => {
   it("builds active inventory and current settled month metrics", () => {
     const summary = buildHomeSummary(
@@ -58,6 +74,11 @@ describe("buildHomeSummary", () => {
         sale("jul", 10000, "2026-07-31"),
         sale("refund", 20000, "2026-08-02"),
       ],
+      [
+        rebate("taobao_alliance", 1000, "2026-08"),
+        rebate("jingfen", 2000, "2026-08"),
+        rebate("jingfen", 9000, "2026-07"),
+      ],
       new Date("2026-08-04T12:00:00+02:00"),
     );
 
@@ -67,7 +88,8 @@ describe("buildHomeSummary", () => {
       month: "2026-08",
       monthLabel: "8月",
       monthlySalesCount: 1,
-      monthlyProfitCents: 3500,
+      monthlyRebateCents: 3000,
+      monthlyProfitCents: 6500,
     });
   });
 
@@ -79,6 +101,7 @@ describe("buildHomeSummary", () => {
       buildHomeSummary(
         [unit("sold", "sold", 8000, 0)],
         [pendingSale],
+        [],
         new Date("2026-08-04T12:00:00+02:00"),
       ).monthlySalesCount,
     ).toBe(0);

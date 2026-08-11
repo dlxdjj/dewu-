@@ -1,5 +1,6 @@
 import type { UnitStatus } from "@/lib/constants/status";
 import type { Platform } from "@/lib/constants/platform";
+import type { RebateSource } from "@/lib/constants/rebate";
 
 interface OwnedRow { id: string; user_id: string; created_at: string; }
 
@@ -17,6 +18,12 @@ export interface Sale extends OwnedRow {
   unit_id: string; sold_price_cents: number | null; platform_fee_cents: number;
   platform_subsidy_cents: number; express_fee_cents: number; other_fee_cents: number;
   actual_payout_cents: number | null; sold_at: string | null; settled_at: string | null; updated_at: string;
+}
+export interface MonthlyRebate extends OwnedRow {
+  month: string;
+  source: RebateSource;
+  amount_cents: number;
+  updated_at: string;
 }
 export type AttachmentOwner = "product" | "batch" | "unit" | "sale";
 export type AttachmentKind = "product_image" | "order_screenshot";

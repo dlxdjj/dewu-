@@ -1,9 +1,10 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type FormEvent } from "react";
 import Card from "@/components/ui/Card";
 import PageHeader from "@/components/ui/PageHeader";
 import Stat from "@/components/ui/Stat";
+import { REBATE_SOURCE_LABELS, type RebateSource } from "@/lib/constants/rebate";
 import { getDb } from "@/lib/data";
 import type { DbAdapter } from "@/lib/data/types";
 import {
@@ -11,8 +12,10 @@ import {
   buildSettlementReport,
   type SettlementSummary,
 } from "@/lib/reports";
+import { saveMonthlyRebates } from "@/lib/services/rebate";
 import type {
   InventoryUnit,
+  MonthlyRebate,
   Product,
   PurchaseBatch,
   Sale,
@@ -25,6 +28,7 @@ interface ReportSource {
   products: Product[];
   batches: PurchaseBatch[];
   sales: Sale[];
+  rebates: MonthlyRebate[];
 }
 
 export default function ReportsPage({
@@ -48,9 +52,10 @@ export default function ReportsPage({
       db.listProducts(),
       db.listBatches(),
       db.listSales(),
+      db.listRebates(),
     ])
-      .then(([units, products, batches, sales]) => {
-        if (active) setRaw({ units, products, batches, sales });
+      .then(([units, products, batches, sales, rebates]) => {
+        if (active) setRaw({ units, products, batches, sales, rebates });
       })
       .catch((reason: unknown) => {
         if (active) {
@@ -70,7 +75,7 @@ export default function ReportsPage({
 
   return (
     <>
-      <PageHeader title="报表" subtitle="仅统计已结算记录与实际到账" />
+      <PageHeader title="报表" subtitle="已结算实际到账 + 返利收入" />
       {error ? (
         <Card>
           <p role="alert" className="text-sm text-danger">
@@ -92,12 +97,35 @@ export default function ReportsPage({
               type="month"
               value={month}
               onChange={(event) => setMonth(event.target.value)}
-              className="mt-1 w-full min-w-0 max-w-full box-border rounded-xl bg-card px-3 py-3"
+              className="mt-1 w-full min-w-0 max-w-full box-border rounded-xl bg-card px-3 py-3 text-base"
             />
           </label>
+          {raw && (
+            <RebateEditor
+              key={month}
+              month={month}
+              rebates={raw.rebates}
+              dataSource={dataSource ?? getDb()}
+              onSaved={(saved) => {
+                setRaw((current) =>
+                  current
+                    ? {
+                        ...current,
+                        rebates: [
+                          ...current.rebates.filter(
+                            (rebate) => !rebate.month.startsWith(month),
+                          ),
+                          ...saved,
+                        ],
+                      }
+                    : current,
+                );
+              }}
+            />
+          )}
           <SummarySection
             ariaLabel={`${monthText}统计`}
-            title={`${monthText}结算`}
+            title={`${monthText}结算与返利`}
             summary={report?.selectedMonth ?? null}
           />
           {report?.selectedMonth.salesCount === 0 && (
@@ -105,7 +133,9 @@ export default function ReportsPage({
               role="status"
               className="mt-3 rounded-2xl bg-card px-4 py-3 text-sm leading-6 text-muted"
             >
-              本月暂无已结算记录，完成结算后将显示销售额和利润。
+              {report.selectedMonth.rebateCents > 0
+                ? "本月暂无已结算记录；已录入的返利仍计入本月利润。"
+                : "本月暂无已结算记录；完成结算或录入返利后将显示利润。"}
             </p>
           )}
         </>
@@ -134,6 +164,104 @@ export default function ReportsPage({
   );
 }
 
+function RebateEditor({
+  month,
+  rebates,
+  dataSource,
+  onSaved,
+}: {
+  month: string;
+  rebates: MonthlyRebate[];
+  dataSource: DbAdapter;
+  onSaved: (rebates: MonthlyRebate[]) => void;
+}) {
+  const amount = (source: RebateSource): number =>
+    rebates.find(
+      (rebate) => rebate.month.startsWith(month) && rebate.source === source,
+    )?.amount_cents ?? 0;
+  const [taobaoAlliance, setTaobaoAlliance] = useState(() =>
+    centsForInput(amount("taobao_alliance")),
+  );
+  const [jingfen, setJingfen] = useState(() =>
+    centsForInput(amount("jingfen")),
+  );
+  const [busy, setBusy] = useState(false);
+  const [message, setMessage] = useState("");
+  const [saveError, setSaveError] = useState("");
+
+  async function submit(event: FormEvent<HTMLFormElement>): Promise<void> {
+    event.preventDefault();
+    setBusy(true);
+    setMessage("");
+    setSaveError("");
+    try {
+      const saved = await saveMonthlyRebates(dataSource, {
+        month,
+        taobaoAllianceYuan: taobaoAlliance,
+        jingfenYuan: jingfen,
+      });
+      onSaved(saved);
+      setMessage("本月返利已保存并计入利润。");
+    } catch (reason: unknown) {
+      setSaveError(reason instanceof Error ? reason.message : "返利保存失败");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <Card className="mt-4">
+      <h2 className="font-semibold">本月返利</h2>
+      <p className="mt-1 text-sm leading-5 text-muted">
+        返利只增加利润，不增加销售额或销量。
+      </p>
+      <form onSubmit={submit} className="mt-3 space-y-3">
+        <div className="grid grid-cols-2 gap-3">
+          <label className="min-w-0 text-sm">
+            {REBATE_SOURCE_LABELS.taobao_alliance}（元）
+            <input
+              aria-label="淘宝联盟返利"
+              required
+              inputMode="decimal"
+              value={taobaoAlliance}
+              onChange={(event) => setTaobaoAlliance(event.target.value)}
+              className="mt-1 w-full min-w-0 rounded-xl bg-background px-3 py-3 text-base"
+            />
+          </label>
+          <label className="min-w-0 text-sm">
+            {REBATE_SOURCE_LABELS.jingfen}（元）
+            <input
+              aria-label="京粉返利"
+              required
+              inputMode="decimal"
+              value={jingfen}
+              onChange={(event) => setJingfen(event.target.value)}
+              className="mt-1 w-full min-w-0 rounded-xl bg-background px-3 py-3 text-base"
+            />
+          </label>
+        </div>
+        {saveError && (
+          <p role="alert" className="text-sm text-danger">
+            {saveError}
+          </p>
+        )}
+        {message && (
+          <p role="status" className="text-sm text-[#1B7F37]">
+            {message}
+          </p>
+        )}
+        <button
+          type="submit"
+          disabled={busy}
+          className="w-full rounded-xl bg-tint py-3 text-[15px] font-medium text-white disabled:opacity-40"
+        >
+          {busy ? "保存中…" : "保存本月返利"}
+        </button>
+      </form>
+    </Card>
+  );
+}
+
 function SummarySection({
   ariaLabel,
   title,
@@ -152,6 +280,9 @@ function SummarySection({
         <Stat
           label={lifetime ? "总利润" : "利润"}
           value={summary ? formatCents(summary.profitCents) : "…"}
+          hint={
+            summary ? `含返利 ${formatCents(summary.rebateCents)}` : undefined
+          }
         />
         <Stat
           label={lifetime ? "总销售额" : "销售额"}
@@ -164,4 +295,8 @@ function SummarySection({
       </div>
     </section>
   );
+}
+
+function centsForInput(cents: number): string {
+  return `${Math.floor(cents / 100)}.${String(cents % 100).padStart(2, "0")}`;
 }

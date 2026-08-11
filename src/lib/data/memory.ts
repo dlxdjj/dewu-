@@ -6,6 +6,7 @@ import type {
   DeleteResult,
   PurchaseInput,
   PurchaseResult,
+  SaveMonthlyRebatesInput,
   SaveAttachmentInput,
   ShipUnitsInput,
   ShipUnitsResult,
@@ -15,6 +16,7 @@ import { allocateShippingCents } from "@/lib/services/shipping";
 import type {
   Attachment,
   InventoryUnit,
+  MonthlyRebate,
   Product,
   PurchaseBatch,
   Sale,
@@ -28,6 +30,7 @@ export interface MemoryState {
   batches: PurchaseBatch[];
   units: InventoryUnit[];
   sales: Sale[];
+  rebates: MonthlyRebate[];
   history: StatusHistory[];
   attachments: Attachment[];
   cleanupJobs: StorageDeletionJob[];
@@ -48,6 +51,7 @@ export class MemoryDbAdapter implements DbAdapter {
       batches: seed.batches ?? [],
       units: seed.units ?? [],
       sales: seed.sales ?? [],
+      rebates: seed.rebates ?? [],
       history: seed.history ?? [],
       attachments: seed.attachments ?? [],
       cleanupJobs: seed.cleanupJobs ?? [],
@@ -95,6 +99,10 @@ export class MemoryDbAdapter implements DbAdapter {
 
   async listSales() {
     return clone(this.state.sales);
+  }
+
+  async listRebates() {
+    return clone(this.state.rebates);
   }
 
   async listHistory(unitId?: string) {
@@ -154,7 +162,7 @@ export class MemoryDbAdapter implements DbAdapter {
           input.initialStatus as (typeof PURCHASE_INITIAL_STATUSES)[number],
         )
       ) {
-        throw new Error("新增采购不能直接进入销售、结算或退款状态");
+        throw new Error("新增采购不能直接进入寄出、销售、结算或退款状态");
       }
 
       const timestamp = now();
@@ -268,7 +276,9 @@ export class MemoryDbAdapter implements DbAdapter {
           to_status: "shipping",
           note: overwrittenUnitIds.includes(unit.id)
             ? "覆盖寄出运费"
-            : "批量寄出",
+            : valid.length === 1
+              ? "单件寄出"
+              : "批量寄出",
           created_at: now(),
         });
         mutate();
@@ -349,6 +359,9 @@ export class MemoryDbAdapter implements DbAdapter {
       if (input.toStatus === "settled") {
         throw new Error("结算必须登记实际到手价和结算日期");
       }
+      if (input.toStatus === "shipping") {
+        throw new Error("寄出必须录入快递费");
+      }
 
       for (const unitId of input.unitIds) {
         const unit = draft.units.find((row) => row.id === unitId);
@@ -420,6 +433,51 @@ export class MemoryDbAdapter implements DbAdapter {
       });
       mutate();
     });
+  }
+
+  async saveMonthlyRebates(input: SaveMonthlyRebatesInput) {
+    return clone(
+      this.transaction((draft, mutate) => {
+        assertCents(input.taobaoAllianceCents, "淘宝联盟返利");
+        assertCents(input.jingfenCents, "京粉返利");
+        if (!/^\d{4}-(0[1-9]|1[0-2])-01$/.test(input.month)) {
+          throw new Error("返利月份格式不正确");
+        }
+
+        const timestamp = now();
+        const values = [
+          {
+            source: "taobao_alliance" as const,
+            amountCents: input.taobaoAllianceCents,
+          },
+          { source: "jingfen" as const, amountCents: input.jingfenCents },
+        ];
+        const rows = values.map(({ source, amountCents }) => {
+          const existing = draft.rebates.find(
+            (row) => row.month === input.month && row.source === source,
+          );
+          if (existing) {
+            existing.amount_cents = amountCents;
+            existing.updated_at = timestamp;
+            mutate();
+            return existing;
+          }
+          const row: MonthlyRebate = {
+            id: id(),
+            user_id: "test-user",
+            month: input.month,
+            source,
+            amount_cents: amountCents,
+            created_at: timestamp,
+            updated_at: timestamp,
+          };
+          draft.rebates.push(row);
+          mutate();
+          return row;
+        });
+        return rows;
+      }),
+    );
   }
 
   async deleteUnitDeep(input: { unitId: string }): Promise<DeleteResult> {
@@ -512,6 +570,7 @@ export class MemoryDbAdapter implements DbAdapter {
         batches: draft.batches.length,
         units: draft.units.length,
         sales: draft.sales.length,
+        rebates: draft.rebates.length,
         history: draft.history.length,
         attachments: draft.attachments.length,
         pendingStoragePaths: draft.attachments.map((row) => row.path),
@@ -529,6 +588,7 @@ export class MemoryDbAdapter implements DbAdapter {
       draft.batches = [];
       draft.units = [];
       draft.sales = [];
+      draft.rebates = [];
       draft.history = [];
       draft.attachments = [];
       mutate();

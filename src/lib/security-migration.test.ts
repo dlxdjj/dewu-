@@ -10,7 +10,11 @@ const integrityMigrationPath = path.resolve(
   __dirname,
   "../../supabase/migrations/0004_state_integrity.sql",
 );
-const migration = [secureMigrationPath, integrityMigrationPath]
+const rebateMigrationPath = path.resolve(
+  __dirname,
+  "../../supabase/migrations/0005_monthly_rebates.sql",
+);
+const migration = [secureMigrationPath, integrityMigrationPath, rebateMigrationPath]
   .map((migrationPath) => fs.readFileSync(migrationPath, "utf8"))
   .join("\n");
 
@@ -36,6 +40,11 @@ describe("secure migration RPC contracts", () => {
     expect(body).toMatch(/p_to_status\s*=\s*'settled'[^]*raise exception/i);
   });
 
+  it("prevents generic status RPC from bypassing freight entry", () => {
+    const body = functionBody("change_units_status");
+    expect(body).toMatch(/p_to_status\s*=\s*'shipping'[^]*raise exception/i);
+  });
+
   it("removes old sales when units leave a sale state through shipping", () => {
     const body = functionBody("ship_units");
     expect(body).toMatch(/delete from sales[^]*unit_id\s*=\s*v_row\.id/i);
@@ -50,7 +59,21 @@ describe("secure migration RPC contracts", () => {
   it("rejects special states as purchase initial status", () => {
     const body = functionBody("create_purchase_simple");
     expect(body).toMatch(
-      /v_status not in \('pending','arrived','shipping','in_stock_dewu','returned'\)/i,
+      /v_status not in \('pending','arrived','in_stock_dewu','returned'\)/i,
     );
+  });
+
+  it("saves both owned rebate sources atomically", () => {
+    const body = functionBody("save_monthly_rebates");
+    expect(body).toMatch(/v_uid uuid := require_uid\(\)/i);
+    expect(body).toMatch(/p_taobao_alliance_cents\s*<\s*0/i);
+    expect(body).toMatch(/p_jingfen_cents\s*<\s*0/i);
+    expect(body).toMatch(/on conflict\(user_id,month,source\)/i);
+  });
+
+  it("clears monthly rebates with all other account data", () => {
+    const body = functionBody("clear_all_data");
+    expect(body).toMatch(/delete from monthly_rebates where user_id = v_uid/i);
+    expect(body).toMatch(/'rebates',c_rebates/i);
   });
 });

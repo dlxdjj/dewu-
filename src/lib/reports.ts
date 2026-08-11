@@ -1,9 +1,11 @@
 import type {
   InventoryUnit,
+  MonthlyRebate,
   Product,
   PurchaseBatch,
   Sale,
 } from "@/lib/types/database";
+import { REBATE_SOURCE_LABELS } from "@/lib/constants/rebate";
 import { actualProfitCents } from "@/lib/utils/profit";
 
 export interface ReportRow {
@@ -16,6 +18,7 @@ export interface ReportRow {
 
 export interface SettlementSummary {
   profitCents: number;
+  rebateCents: number;
   salesCents: number;
   salesCount: number;
 }
@@ -24,6 +27,7 @@ export interface SettlementReport {
   allTime: SettlementSummary;
   selectedMonth: SettlementSummary;
   rows: ReportRow[];
+  rebates: MonthlyRebate[];
 }
 
 export interface ReportInput {
@@ -31,12 +35,17 @@ export interface ReportInput {
   products: Product[];
   batches: PurchaseBatch[];
   sales: Sale[];
+  rebates: MonthlyRebate[];
   month: string;
 }
 
-function summarize(rows: ReportRow[]): SettlementSummary {
+function summarize(
+  rows: ReportRow[],
+  rebateCents: number,
+): SettlementSummary {
   return {
-    profitCents: rows.reduce((sum, row) => sum + row.profit, 0),
+    profitCents: rows.reduce((sum, row) => sum + row.profit, 0) + rebateCents,
+    rebateCents,
     salesCents: rows.reduce(
       (sum, row) => sum + (row.sale.actual_payout_cents ?? 0),
       0,
@@ -73,11 +82,23 @@ export function buildSettlementReport(input: ReportInput): SettlementReport {
   const rows = allRows.filter((row) =>
     row.sale.settled_at?.startsWith(input.month),
   );
+  const rebates = input.rebates.filter((rebate) =>
+    rebate.month.startsWith(input.month),
+  );
+  const allRebateCents = input.rebates.reduce(
+    (sum, rebate) => sum + rebate.amount_cents,
+    0,
+  );
+  const selectedRebateCents = rebates.reduce(
+    (sum, rebate) => sum + rebate.amount_cents,
+    0,
+  );
 
   return {
-    allTime: summarize(allRows),
-    selectedMonth: summarize(rows),
+    allTime: summarize(allRows, allRebateCents),
+    selectedMonth: summarize(rows, selectedRebateCents),
     rows,
+    rebates,
   };
 }
 
@@ -105,12 +126,23 @@ export function buildCsv(report: SettlementReport, month: string): string {
       .join(","),
   );
   const lines = [
-    "范围,利润(分),销售额(分),销量",
-    `历史累计,${report.allTime.profitCents},${report.allTime.salesCents},${report.allTime.salesCount}`,
-    `${month},${report.selectedMonth.profitCents},${report.selectedMonth.salesCents},${report.selectedMonth.salesCount}`,
+    "范围,利润(分),返利收入(分),销售额(分),销量",
+    `历史累计,${report.allTime.profitCents},${report.allTime.rebateCents},${report.allTime.salesCents},${report.allTime.salesCount}`,
+    `${month},${report.selectedMonth.profitCents},${report.selectedMonth.rebateCents},${report.selectedMonth.salesCents},${report.selectedMonth.salesCount}`,
     "",
     detailHeader.join(","),
     ...details,
+    "",
+    "返利来源,月份,金额(分)",
+    ...report.rebates.map((rebate) =>
+      [
+        REBATE_SOURCE_LABELS[rebate.source],
+        rebate.month.slice(0, 7),
+        rebate.amount_cents,
+      ]
+        .map(csv)
+        .join(","),
+    ),
   ];
   return `\uFEFF${lines.join("\n")}`;
 }

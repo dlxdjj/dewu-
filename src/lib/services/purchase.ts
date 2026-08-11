@@ -17,7 +17,7 @@ export async function createPurchase(db: DbAdapter, input: PurchaseFormInput): P
   if (!input.size.trim()) throw new Error("请填写尺码");
   if (!/^\d{4}-\d{2}-\d{2}$/.test(input.purchasedAt)) throw new Error("采购日期格式不正确");
   if (!PURCHASE_INITIAL_STATUSES.includes(input.initialStatus as (typeof PURCHASE_INITIAL_STATUSES)[number])) {
-    throw new Error("新增采购不能直接设为已售、已结算或退款，请保存后使用对应操作");
+    throw new Error("新增采购不能直接设为寄出、已售、已结算或退款，请保存后使用对应操作");
   }
   return db.createPurchase({ productName, styleCode, platform: input.platform, unitPriceCents: parseYuanToCents(input.unitPriceYuan), quantity: input.quantity, purchasedAt: input.purchasedAt, size: input.size.trim(), initialStatus: input.initialStatus, orderNo: input.orderNo?.trim() ?? "", note: input.note?.trim() ?? "" });
 }

@@ -20,7 +20,24 @@ describe("status and sale integrity", () => {
     const db = new MemoryDbAdapter();
     await expect(
       db.createPurchase({ ...purchaseInput, initialStatus: "settled" }),
-    ).rejects.toThrow("不能直接进入销售、结算或退款状态");
+    ).rejects.toThrow("不能直接进入寄出、销售、结算或退款状态");
+    await expect(
+      db.createPurchase({ ...purchaseInput, initialStatus: "shipping" }),
+    ).rejects.toThrow("不能直接进入寄出、销售、结算或退款状态");
+  });
+
+  it("requires the dedicated freight flow for single and batch shipping", async () => {
+    const db = new MemoryDbAdapter();
+    await db.createPurchase(purchaseInput);
+    const unit = db.snapshot().units[0];
+
+    await expect(changeUnitStatus(db, unit, "shipping")).rejects.toThrow(
+      "必须先录入快递费",
+    );
+    await expect(batchChangeStatus(db, [unit], "shipping")).rejects.toThrow(
+      "录入总快递费",
+    );
+    expect(db.snapshot().units[0].status).toBe("arrived");
   });
 
   it("changes settled back to sold without retaining payout", async () => {

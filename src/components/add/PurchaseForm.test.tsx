@@ -38,6 +38,7 @@ describe("PurchaseForm", () => {
     render(<PurchaseForm dataSource={new MemoryDbAdapter()} onComplete={vi.fn()} />);
 
     const status = screen.getByLabelText("当前状态");
+    expect(status).not.toHaveTextContent("发往得物途中");
     expect(status).not.toHaveTextContent("已售待结算");
     expect(status).not.toHaveTextContent("已结算");
     expect(status).not.toHaveTextContent("退款");

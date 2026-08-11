@@ -112,8 +112,48 @@ describe("ReportsPage", () => {
 
     expect(
       await screen.findByText(
-        "本月暂无已结算记录，完成结算后将显示销售额和利润。",
+        "本月暂无已结算记录；完成结算或录入返利后将显示利润。",
       ),
     ).toBeInTheDocument();
+  });
+
+  it("saves both rebate sources and adds them only to profit", async () => {
+    const db = await settledDb();
+    render(<ReportsPage dataSource={db} initialMonth="2026-08" />);
+
+    await screen.findByRole("region", { name: "8月统计" });
+    await userEvent.clear(screen.getByLabelText("淘宝联盟返利"));
+    await userEvent.type(screen.getByLabelText("淘宝联盟返利"), "10");
+    await userEvent.clear(screen.getByLabelText("京粉返利"));
+    await userEvent.type(screen.getByLabelText("京粉返利"), "20");
+    await userEvent.click(
+      screen.getByRole("button", { name: "保存本月返利" }),
+    );
+
+    expect(
+      await screen.findByText("本月返利已保存并计入利润。"),
+    ).toBeInTheDocument();
+    const lifetime = screen.getByRole("region", { name: "历史累计" });
+    expect(within(lifetime).getByText("¥120.00")).toBeInTheDocument();
+    expect(within(lifetime).getByText("¥240.00")).toBeInTheDocument();
+    expect(within(lifetime).getByText("2")).toBeInTheDocument();
+    const monthly = screen.getByRole("region", { name: "8月统计" });
+    expect(within(monthly).getByText("¥70.00")).toBeInTheDocument();
+    expect(within(monthly).getByText("¥120.00")).toBeInTheDocument();
+    expect(within(monthly).getByText("1")).toBeInTheDocument();
+    expect(db.snapshot().rebates).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          month: "2026-08-01",
+          source: "taobao_alliance",
+          amount_cents: 1000,
+        }),
+        expect.objectContaining({
+          month: "2026-08-01",
+          source: "jingfen",
+          amount_cents: 2000,
+        }),
+      ]),
+    );
   });
 });

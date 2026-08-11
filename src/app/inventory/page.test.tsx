@@ -37,6 +37,7 @@ describe("InventoryPage", () => {
 
     expect(screen.getByText("已选 3 件")).toBeInTheDocument();
     const target = screen.getByLabelText("目标状态");
+    expect(target).not.toHaveTextContent("发往得物途中");
     expect(target).not.toHaveTextContent("已结算");
     expect(target).not.toHaveTextContent("退款");
   });

@@ -14,6 +14,7 @@ import { formatCents } from "@/lib/utils/money";
 interface HomeDataSource {
   listSales: ReturnType<typeof getDb>["listSales"];
   listUnits: ReturnType<typeof getDb>["listUnits"];
+  listRebates: ReturnType<typeof getDb>["listRebates"];
 }
 
 export default function HomePage({
@@ -39,11 +40,14 @@ export default function HomePage({
     async function load(): Promise<void> {
       try {
         const db = dataSource ?? getDb();
-        const [units, sales] = await Promise.all([
+        const [units, sales, rebates] = await Promise.all([
           db.listUnits(),
           db.listSales(),
+          db.listRebates(),
         ]);
-        if (active) setData(buildHomeSummary(units, sales, referenceNow));
+        if (active) {
+          setData(buildHomeSummary(units, sales, rebates, referenceNow));
+        }
       } catch (reason: unknown) {
         if (!active) return;
         setError(reason instanceof Error ? reason.message : "加载失败");
@@ -93,14 +97,20 @@ export default function HomePage({
           <Stat
             label={`${data?.monthLabel ?? monthLabel}利润`}
             value={data ? formatCents(data.monthlyProfitCents) : "…"}
-            hint="实际到账口径"
+            hint={
+              data
+                ? `含返利 ${formatCents(data.monthlyRebateCents)}`
+                : "含返利收入"
+            }
           />
           {data?.monthlySalesCount === 0 && (
             <p
               role="status"
               className="col-span-2 rounded-2xl bg-card px-4 py-3 text-sm leading-6 text-muted md:col-span-4"
             >
-              本月暂无已结算销售；完成结算后将显示销量和利润。
+              {data.monthlyRebateCents > 0
+                ? "本月暂无已结算销售；当前利润来自返利收入。"
+                : "本月暂无已结算销售；完成结算或录入返利后将显示利润。"}
             </p>
           )}
         </div>
