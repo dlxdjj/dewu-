@@ -1,9 +1,13 @@
 "use client";
 
-import { useEffect, useMemo, useRef } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import {
+  compressImage,
+  prepareProductImage,
+} from "@/lib/image-processing";
 import { CameraIcon } from "./icons";
 
-/** 图片选择（拍照/相册），自动压缩到最长边 1200px 的 JPEG */
+/** 商品图片选择：自动裁截图黑边，再压缩到最长边 1200px 的 JPEG。 */
 export default function ImagePicker({
   label,
   value,
@@ -14,6 +18,12 @@ export default function ImagePicker({
   onChange: (blob: Blob | null) => void;
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
+  const sourceFileRef = useRef<File | null>(null);
+  const autoCroppedBlobRef = useRef<Blob | null>(null);
+  const [processing, setProcessing] = useState(false);
+  const [hasAutoCrop, setHasAutoCrop] = useState(false);
+  const [usingOriginal, setUsingOriginal] = useState(false);
+  const [error, setError] = useState("");
 
   // 由 value 派生预览 URL，并在变化时释放旧 URL
   const preview = useMemo(() => (value ? URL.createObjectURL(value) : null), [value]);
@@ -23,21 +33,59 @@ export default function ImagePicker({
     };
   }, [preview]);
 
-  async function handleFile(file: File | undefined) {
+  async function handleFile(file: File | undefined): Promise<void> {
     if (!file) return;
-    onChange(await compressImage(file, 1200, 0.82));
+    setProcessing(true);
+    setError("");
+    try {
+      const result = await prepareProductImage(file);
+      sourceFileRef.current = file;
+      autoCroppedBlobRef.current = result.cropApplied ? result.blob : null;
+      setHasAutoCrop(result.cropApplied);
+      setUsingOriginal(false);
+      onChange(result.blob);
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "图片处理失败");
+    } finally {
+      setProcessing(false);
+    }
+  }
+
+  async function selectOriginal(): Promise<void> {
+    const source = sourceFileRef.current;
+    if (!source) return;
+    setProcessing(true);
+    setError("");
+    try {
+      onChange(await compressImage(source, 1200, 0.82));
+      setUsingOriginal(true);
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "图片处理失败");
+    } finally {
+      setProcessing(false);
+    }
+  }
+
+  function useAutoCrop(): void {
+    const cropped = autoCroppedBlobRef.current;
+    if (!cropped) return;
+    onChange(cropped);
+    setUsingOriginal(false);
   }
 
   return (
     <div>
       <button
         type="button"
+        disabled={processing}
         onClick={() => inputRef.current?.click()}
-        className="relative flex h-24 w-full items-center justify-center overflow-hidden rounded-xl border border-dashed border-separator bg-background text-muted active:bg-separator/40"
+        className={`relative flex w-full items-center justify-center overflow-hidden rounded-xl border border-dashed border-separator bg-background text-muted active:bg-separator/40 disabled:opacity-60 ${
+          preview ? "h-44" : "h-24"
+        }`}
       >
         {preview ? (
           // eslint-disable-next-line @next/next/no-img-element
-          <img src={preview} alt={label} className="h-full w-full object-cover" />
+          <img src={preview} alt={label} className="h-full w-full object-contain" />
         ) : (
           <span className="flex flex-col items-center gap-1">
             <CameraIcon size={24} strokeWidth={1.5} />
@@ -50,42 +98,33 @@ export default function ImagePicker({
         type="file"
         accept="image/*"
         className="hidden"
-        onChange={(e) => handleFile(e.target.files?.[0])}
+        onChange={(event) => {
+          void handleFile(event.target.files?.[0]);
+          event.currentTarget.value = "";
+        }}
       />
+      {processing && (
+        <p role="status" className="mt-2 text-xs text-muted">
+          正在自动检查并压缩图片…
+        </p>
+      )}
+      {!processing && hasAutoCrop && (
+        <div className="mt-2 flex min-h-11 items-center justify-between gap-3 rounded-xl bg-[#E8F3EA] px-3 py-2 text-xs text-[#1B7F37]">
+          <span>{usingOriginal ? "当前使用原图" : "已自动裁去截图黑边"}</span>
+          <button
+            type="button"
+            onClick={usingOriginal ? useAutoCrop : () => void selectOriginal()}
+            className="min-h-11 shrink-0 font-medium underline underline-offset-2"
+          >
+            {usingOriginal ? "恢复自动裁剪" : "使用原图"}
+          </button>
+        </div>
+      )}
+      {error && (
+        <p role="alert" className="mt-2 text-xs text-danger">
+          {error}
+        </p>
+      )}
     </div>
   );
-}
-
-/** canvas 压缩图片 */
-export function compressImage(
-  file: Blob,
-  maxSide: number,
-  quality: number,
-): Promise<Blob> {
-  return new Promise((resolve, reject) => {
-    const url = URL.createObjectURL(file);
-    const img = new Image();
-    img.onload = () => {
-      URL.revokeObjectURL(url);
-      const scale = Math.min(1, maxSide / Math.max(img.width, img.height));
-      const w = Math.round(img.width * scale);
-      const h = Math.round(img.height * scale);
-      const canvas = document.createElement("canvas");
-      canvas.width = w;
-      canvas.height = h;
-      const ctx = canvas.getContext("2d");
-      if (!ctx) return reject(new Error("canvas 不可用"));
-      ctx.drawImage(img, 0, 0, w, h);
-      canvas.toBlob(
-        (blob) => (blob ? resolve(blob) : reject(new Error("图片压缩失败"))),
-        "image/jpeg",
-        quality,
-      );
-    };
-    img.onerror = () => {
-      URL.revokeObjectURL(url);
-      reject(new Error("图片读取失败"));
-    };
-    img.src = url;
-  });
 }

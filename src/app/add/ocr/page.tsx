@@ -7,7 +7,7 @@ import PageHeader from "@/components/ui/PageHeader";
 import Card from "@/components/ui/Card";
 import Field, { inputCls, moneyInputProps } from "@/components/ui/Field";
 import { CameraIcon } from "@/components/ui/icons";
-import { compressImage } from "@/components/ui/ImagePicker";
+import { compressImage } from "@/lib/image-processing";
 import {
   OCR_PREFILL_KEY,
   disposeOcrWorker,

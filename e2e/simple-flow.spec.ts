@@ -71,6 +71,56 @@ test("390px add form keeps the purchase date inside the viewport", async ({
   expect(width.scroll).toBeLessThanOrEqual(width.client);
 });
 
+test("390px product image picker crops screenshot bars and can restore the original", async ({
+  page,
+}) => {
+  await installAuthenticatedSession(page);
+  await page.route("**/rest/v1/**", (route) => route.fulfill({ json: [] }));
+  await page.goto("/add/");
+
+  const screenshotSvg = `
+    <svg xmlns="http://www.w3.org/2000/svg" width="400" height="1000">
+      <rect width="400" height="1000" fill="#000"/>
+      <rect y="250" width="400" height="400" fill="#fff"/>
+      <rect x="120" y="320" width="160" height="260" rx="24" fill="#b40020"/>
+      <circle cx="45" cy="65" r="12" fill="#fff"/>
+      <rect x="320" y="850" width="35" height="35" fill="#fff"/>
+    </svg>`;
+  const input = page.locator('input[type="file"]');
+  await input.setInputFiles({
+    name: "product-screenshot.svg",
+    mimeType: "image/svg+xml",
+    buffer: Buffer.from(screenshotSvg),
+  });
+
+  await expect(page.getByText("已自动裁去截图黑边")).toBeVisible();
+  const preview = page.getByRole("img", { name: "添加商品图片" });
+  await expect(preview).toBeVisible();
+  expect(
+    await preview.evaluate((image: HTMLImageElement) => ({
+      width: image.naturalWidth,
+      height: image.naturalHeight,
+    })),
+  ).toEqual({ width: 400, height: 400 });
+
+  await page.getByRole("button", { name: "使用原图" }).click();
+  await expect(page.getByText("当前使用原图")).toBeVisible();
+  await expect
+    .poll(() =>
+      preview.evaluate((image: HTMLImageElement) => ({
+        width: image.naturalWidth,
+        height: image.naturalHeight,
+      })),
+    )
+    .toEqual({ width: 400, height: 1000 });
+  expect(
+    await page.evaluate(() => ({
+      client: document.documentElement.clientWidth,
+      scroll: document.documentElement.scrollWidth,
+    })),
+  ).toMatchObject({ client: 390, scroll: 390 });
+});
+
 test("390px rebate form is readable and saves both sources", async ({
   page,
 }) => {
