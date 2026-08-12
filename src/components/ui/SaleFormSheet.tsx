@@ -108,14 +108,16 @@ export default function SaleFormSheet({
         )}
         <label className="block min-w-0 text-sm">
           结算日期（必填）
-          <input
-            aria-label="结算日期"
-            required
-            type="date"
-            value={date}
-            onChange={(event) => setDate(event.target.value)}
-            className="mt-1 w-full min-w-0 max-w-full box-border rounded-xl bg-background px-3 py-3 text-base"
-          />
+          <span className="date-input-shell mt-1">
+            <input
+              aria-label="结算日期"
+              required
+              type="date"
+              value={date}
+              onChange={(event) => setDate(event.target.value)}
+              className="mobile-date-input"
+            />
+          </span>
         </label>
         {error && (
           <p role="alert" className="text-center text-sm text-danger">

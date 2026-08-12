@@ -92,13 +92,15 @@ export default function ReportsPage({
           />
           <label className="mt-4 block min-w-0 text-sm">
             月份
-            <input
-              aria-label="月份"
-              type="month"
-              value={month}
-              onChange={(event) => setMonth(event.target.value)}
-              className="mt-1 w-full min-w-0 max-w-full box-border rounded-xl bg-card px-3 py-3 text-base"
-            />
+            <span className="date-input-shell date-input-shell-card mt-1">
+              <input
+                aria-label="月份"
+                type="month"
+                value={month}
+                onChange={(event) => setMonth(event.target.value)}
+                className="mobile-date-input"
+              />
+            </span>
           </label>
           {raw && (
             <RebateEditor
@@ -276,21 +278,24 @@ function SummarySection({
   return (
     <section aria-label={ariaLabel} className="mt-3">
       <h2 className="mb-2 text-sm font-medium text-muted">{title}</h2>
-      <div className="grid grid-cols-3 gap-2">
+      <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(4.25rem,0.62fr)] gap-2">
         <Stat
           label={lifetime ? "总利润" : "利润"}
           value={summary ? formatCents(summary.profitCents) : "…"}
           hint={
             summary ? `含返利 ${formatCents(summary.rebateCents)}` : undefined
           }
+          compact
         />
         <Stat
           label={lifetime ? "总销售额" : "销售额"}
           value={summary ? formatCents(summary.salesCents) : "…"}
+          compact
         />
         <Stat
           label={lifetime ? "总销量" : "销量"}
           value={summary ? String(summary.salesCount) : "…"}
+          compact
         />
       </div>
     </section>

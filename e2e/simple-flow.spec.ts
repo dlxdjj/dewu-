@@ -64,6 +64,27 @@ test("390px add form keeps the purchase date inside the viewport", async ({
   const bounds = await date.boundingBox();
   expect(bounds).not.toBeNull();
   expect((bounds?.x ?? 0) + (bounds?.width ?? 0)).toBeLessThanOrEqual(374);
+  const dateGeometry = await date.evaluate((input) => {
+    const control = input.getBoundingClientRect();
+    const shell = input.parentElement?.getBoundingClientRect();
+    const card = input.closest(".rounded-2xl")?.getBoundingClientRect();
+    return {
+      controlLeft: control.left,
+      controlRight: control.right,
+      shellLeft: shell?.left ?? 0,
+      shellRight: shell?.right ?? 0,
+      cardLeft: card?.left ?? 0,
+      cardRight: card?.right ?? 0,
+    };
+  });
+  expect(dateGeometry.controlLeft).toBeGreaterThanOrEqual(
+    dateGeometry.shellLeft,
+  );
+  expect(dateGeometry.controlRight).toBeLessThanOrEqual(
+    dateGeometry.shellRight,
+  );
+  expect(dateGeometry.shellLeft).toBeGreaterThanOrEqual(dateGeometry.cardLeft);
+  expect(dateGeometry.shellRight).toBeLessThanOrEqual(dateGeometry.cardRight);
   const width = await page.evaluate(() => ({
     client: document.documentElement.clientWidth,
     scroll: document.documentElement.scrollWidth,
@@ -167,6 +188,120 @@ test("390px rebate form is readable and saves both sources", async ({
   await page.getByRole("button", { name: "保存本月返利" }).click();
   await expect(page.getByText("本月返利已保存并计入利润。")).toBeVisible();
 
+  const width = await page.evaluate(() => ({
+    client: document.documentElement.clientWidth,
+    scroll: document.documentElement.scrollWidth,
+  }));
+  expect(width.scroll).toBeLessThanOrEqual(width.client);
+});
+
+test("390px report centers a long sales amount inside its card", async ({
+  page,
+}) => {
+  await installAuthenticatedSession(page);
+  const timestamp = "2026-08-12T00:00:00Z";
+  await page.route("**/rest/v1/**", (route) => {
+    const table = new URL(route.request().url()).pathname.split("/").at(-1);
+    if (table === "products") {
+      return route.fulfill({
+        json: [
+          {
+            id: "report-product",
+            user_id: "test-user",
+            name: "报表测试商品",
+            style_code: "REPORT-1",
+            brand: null,
+            created_at: timestamp,
+            updated_at: timestamp,
+          },
+        ],
+      });
+    }
+    if (table === "purchase_batches") {
+      return route.fulfill({
+        json: [
+          {
+            id: "report-batch",
+            user_id: "test-user",
+            product_id: "report-product",
+            platform: "taobao",
+            order_no: null,
+            unit_price_cents: 225719,
+            quantity: 1,
+            shipping_fee_cents: 0,
+            discount_amount_cents: 0,
+            purchased_at: "2026-08-01",
+            note: null,
+            created_at: timestamp,
+            updated_at: timestamp,
+          },
+        ],
+      });
+    }
+    if (table === "inventory_units") {
+      return route.fulfill({
+        json: [
+          {
+            id: "report-unit",
+            user_id: "test-user",
+            batch_id: "report-batch",
+            product_id: "report-product",
+            size: "L",
+            unit_cost_cents: 225719,
+            listing_price_cents: null,
+            outbound_shipping_cents: 0,
+            status: "settled",
+            created_at: timestamp,
+            updated_at: timestamp,
+          },
+        ],
+      });
+    }
+    if (table === "sales") {
+      return route.fulfill({
+        json: [
+          {
+            id: "report-sale",
+            user_id: "test-user",
+            unit_id: "report-unit",
+            sold_price_cents: null,
+            platform_fee_cents: 0,
+            platform_subsidy_cents: 0,
+            express_fee_cents: 0,
+            other_fee_cents: 0,
+            actual_payout_cents: 238900,
+            sold_at: "2026-08-11",
+            settled_at: "2026-08-12",
+            created_at: timestamp,
+            updated_at: timestamp,
+          },
+        ],
+      });
+    }
+    return route.fulfill({ json: [] });
+  });
+
+  await page.goto("/reports/");
+  const salesAmount = page.getByText("¥2,389.00").first();
+  await expect(salesAmount).toBeVisible();
+  const metrics = await salesAmount.evaluate((value) => {
+    const card = value.parentElement;
+    const valueRect = value.getBoundingClientRect();
+    const cardRect = card?.getBoundingClientRect();
+    return {
+      textAlign: getComputedStyle(value).textAlign,
+      clientWidth: value.clientWidth,
+      scrollWidth: value.scrollWidth,
+      valueLeft: valueRect.left,
+      valueRight: valueRect.right,
+      cardLeft: cardRect?.left ?? 0,
+      cardRight: cardRect?.right ?? 0,
+    };
+  });
+  expect(metrics.textAlign).toBe("center");
+  expect(metrics.scrollWidth).toBeLessThanOrEqual(metrics.clientWidth);
+  expect(metrics.valueLeft).toBeGreaterThanOrEqual(metrics.cardLeft);
+  expect(metrics.valueRight).toBeLessThanOrEqual(metrics.cardRight);
   const width = await page.evaluate(() => ({
     client: document.documentElement.clientWidth,
     scroll: document.documentElement.scrollWidth,

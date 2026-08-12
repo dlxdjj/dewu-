@@ -247,14 +247,16 @@ export default function PurchaseForm({
           </div>
           <label className="block min-w-0 max-w-full text-sm">
             采购日期（必填）
-            <input
-              aria-label="采购日期（必填）"
-              required
-              type="date"
-              className={`${inputClass} mt-1`}
-              value={form.purchasedAt}
-              onChange={(event) => set("purchasedAt", event.target.value)}
-            />
+            <span className="date-input-shell mt-1">
+              <input
+                aria-label="采购日期（必填）"
+                required
+                type="date"
+                className="mobile-date-input"
+                value={form.purchasedAt}
+                onChange={(event) => set("purchasedAt", event.target.value)}
+              />
+            </span>
           </label>
           <label className="block min-w-0 text-sm">
             采购平台

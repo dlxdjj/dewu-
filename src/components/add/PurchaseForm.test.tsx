@@ -143,11 +143,8 @@ describe("PurchaseForm", () => {
   it("constrains the purchase date input to the mobile card width", () => {
     render(<PurchaseForm dataSource={new MemoryDbAdapter()} onComplete={vi.fn()} />);
 
-    expect(screen.getByLabelText("采购日期（必填）")).toHaveClass(
-      "w-full",
-      "min-w-0",
-      "max-w-full",
-      "box-border",
-    );
+    const input = screen.getByLabelText("采购日期（必填）");
+    expect(input).toHaveClass("mobile-date-input");
+    expect(input.parentElement).toHaveClass("date-input-shell");
   });
 });

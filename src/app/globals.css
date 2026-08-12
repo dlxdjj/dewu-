@@ -48,3 +48,41 @@ body {
 .no-scrollbar::-webkit-scrollbar {
   display: none;
 }
+
+/* iOS Safari 的原生 date/month 控件带固有最小宽度；外壳负责可靠裁切。 */
+.date-input-shell {
+  display: block;
+  inline-size: 100%;
+  min-inline-size: 0;
+  max-inline-size: 100%;
+  overflow: hidden;
+  border-radius: 0.75rem;
+  background: var(--color-background);
+}
+
+.mobile-date-input {
+  display: block;
+  box-sizing: border-box;
+  inline-size: 100%;
+  min-inline-size: 0;
+  max-inline-size: 100%;
+  min-block-size: 3rem;
+  border: 0;
+  border-radius: 0.75rem;
+  background: var(--color-background);
+  padding: 0.75rem;
+  color: var(--color-label);
+  font: inherit;
+  font-size: 1rem;
+}
+
+.mobile-date-input::-webkit-date-and-time-value {
+  min-inline-size: 0;
+  margin: 0;
+  text-align: left;
+}
+
+.date-input-shell-card,
+.date-input-shell-card .mobile-date-input {
+  background: var(--color-card);
+}
