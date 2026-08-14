@@ -1,21 +1,44 @@
 @import "tailwindcss";
 
-/* ===== 设计变量：苹果简约风格（无渐变、无发光） ===== */
+/* ===== Cirrus：天空画布、云白表面与胶囊控件 ===== */
 @theme {
-  --color-background: #f2f2f7; /* 页面浅灰底 */
-  --color-card: #ffffff; /* 白色卡片 */
-  --color-label: #1c1c1e; /* 主文字 */
-  --color-muted: #636366; /* 次要文字，满足小字号对比度 */
-  --color-tint: #0067c0; /* 可访问系统蓝 */
-  --color-danger: #d70015; /* 危险操作与错误 */
-  --color-separator: #e5e5ea; /* 细分隔线 */
+  --color-background: #f3f6fa;
+  --color-card: #ffffff;
+  --color-label: #0e1116;
+  --color-muted: #5b6472;
+  --color-tint: #2e7def;
+  --color-danger: #d94f25;
+  --color-separator: #e3e8ee;
 
   --font-sans:
-    -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue",
+    "Avenir Next", Inter, -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue",
     "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
 }
 
+:root {
+  --cirrus-sky: #edf2f7;
+  --cirrus-horizon: #b8d4f1;
+  --cirrus-cloud: #ffffff;
+  --cirrus-ink: #0e1116;
+  --cirrus-mist: #5b6472;
+  --cirrus-mist-soft: #8a93a3;
+  --cirrus-edge: #e3e8ee;
+  --cirrus-sunken: #f3f6fa;
+  --cirrus-signal: #2e7def;
+  --cirrus-citrus: #ff7a3d;
+  --cirrus-meadow: #2bc48a;
+  --cirrus-display: "Avenir Next", "Helvetica Neue", "PingFang SC", sans-serif;
+  --cirrus-shadow-1:
+    0 1px 1px rgba(14, 17, 22, 0.04),
+    0 20px 40px -24px rgba(14, 17, 22, 0.18);
+  --cirrus-shadow-2:
+    0 1px 1px rgba(14, 17, 22, 0.04),
+    0 20px 40px -24px rgba(14, 17, 22, 0.22),
+    0 2px 6px rgba(14, 17, 22, 0.06);
+}
+
 html {
+  background: var(--cirrus-sky);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   -webkit-text-size-adjust: 100%;
@@ -24,9 +47,116 @@ html {
 }
 
 body {
-  background: var(--color-background);
+  position: relative;
+  isolation: isolate;
+  min-height: 100dvh;
+  background: transparent;
   color: var(--color-label);
   font-family: var(--font-sans);
+  font-variant-numeric: tabular-nums;
+}
+
+body::before {
+  content: "";
+  position: fixed;
+  z-index: -1;
+  inset: 0;
+  pointer-events: none;
+  background-image:
+    radial-gradient(
+      62% 38% at 18% 78%,
+      rgba(255, 255, 255, 0.95) 0%,
+      rgba(255, 255, 255, 0) 62%
+    ),
+    radial-gradient(
+      52% 34% at 82% 70%,
+      rgba(255, 255, 255, 0.9) 0%,
+      rgba(255, 255, 255, 0) 60%
+    ),
+    radial-gradient(
+      48% 30% at 50% 18%,
+      rgba(255, 255, 255, 0.75) 0%,
+      rgba(255, 255, 255, 0) 60%
+    ),
+    linear-gradient(180deg, var(--cirrus-horizon) 0%, var(--cirrus-sky) 78%);
+}
+
+.app-main {
+  min-height: 100dvh;
+}
+
+h1,
+h2,
+h3 {
+  font-family: var(--cirrus-display);
+  letter-spacing: -0.02em;
+}
+
+/* Tailwind 的同一 tint token 同时用于按钮与链接；Cirrus 分开处理。 */
+.bg-tint {
+  background-color: var(--cirrus-ink) !important;
+}
+
+.text-tint {
+  color: var(--cirrus-signal) !important;
+}
+
+.ring-tint {
+  --tw-ring-color: var(--cirrus-signal) !important;
+}
+
+.bg-card {
+  border-color: var(--cirrus-edge);
+}
+
+.rounded-2xl.bg-card {
+  border: 1px solid var(--cirrus-edge);
+  border-radius: 28px;
+  box-shadow: var(--cirrus-shadow-1);
+}
+
+/* 单行表单控件统一为 Cloud 胶囊，保留 16px 字号防止 iOS 自动放大。 */
+:where(input:not([type="file"]):not([type="checkbox"]):not([type="radio"]), select) {
+  min-height: 2.75rem;
+  border: 1px solid var(--cirrus-edge) !important;
+  border-radius: 999px !important;
+  background: var(--cirrus-cloud) !important;
+  box-shadow: var(--cirrus-shadow-1);
+  color: var(--cirrus-ink);
+  font-size: 1rem;
+}
+
+textarea {
+  border: 1px solid var(--cirrus-edge) !important;
+  border-radius: 22px !important;
+  background: var(--cirrus-cloud) !important;
+  box-shadow: var(--cirrus-shadow-1);
+}
+
+:where(input, select, textarea)::placeholder {
+  color: var(--cirrus-mist-soft);
+}
+
+:where(input, select, textarea):focus {
+  border-color: var(--cirrus-signal) !important;
+  outline: 0;
+  box-shadow: 0 0 0 3px rgba(46, 125, 239, 0.28) !important;
+}
+
+button.rounded-xl,
+a.rounded-xl {
+  border-radius: 999px !important;
+}
+
+button.rounded-2xl,
+a.rounded-2xl {
+  border-radius: 999px !important;
+}
+
+@media (min-width: 768px) {
+  .app-main {
+    padding-inline: 1.5rem;
+  }
 }
 
 /* 所有键盘可操作元素都保留清晰、统一的焦点指示。 */
@@ -56,8 +186,10 @@ body {
   min-inline-size: 0;
   max-inline-size: 100%;
   overflow: hidden;
-  border-radius: 0.75rem;
-  background: var(--color-background);
+  border: 1px solid var(--cirrus-edge);
+  border-radius: 999px;
+  background: var(--cirrus-cloud);
+  box-shadow: var(--cirrus-shadow-1);
 }
 
 .mobile-date-input {
@@ -68,8 +200,8 @@ body {
   max-inline-size: 100%;
   min-block-size: 3rem;
   border: 0;
-  border-radius: 0.75rem;
-  background: var(--color-background);
+  border-radius: 999px;
+  background: var(--cirrus-cloud);
   padding: 0.75rem;
   color: var(--color-label);
   font: inherit;
@@ -85,4 +217,9 @@ body {
 .date-input-shell-card,
 .date-input-shell-card .mobile-date-input {
   background: var(--color-card);
+}
+
+.date-input-shell .mobile-date-input {
+  border: 0 !important;
+  box-shadow: none !important;
 }

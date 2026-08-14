@@ -172,7 +172,7 @@ export default function ReportsPage({
           anchor.click();
           URL.revokeObjectURL(url);
         }}
-        className="mt-4 w-full rounded-xl bg-card py-3 text-tint disabled:opacity-40"
+        className="mt-4 w-full rounded-full border border-separator bg-card py-3.5 font-medium text-tint shadow-[var(--cirrus-shadow-1)] disabled:opacity-40"
       >
         导出 CSV
       </button>
@@ -273,7 +273,7 @@ function RebateEditor({
         <button
           type="submit"
           disabled={busy}
-          className="w-full rounded-xl bg-tint py-3 text-[15px] font-medium text-white disabled:opacity-40"
+          className="w-full rounded-full bg-tint py-3.5 text-[15px] font-medium text-white shadow-[var(--cirrus-shadow-2)] disabled:opacity-40"
         >
           {busy ? "保存中…" : "保存本月返利"}
         </button>

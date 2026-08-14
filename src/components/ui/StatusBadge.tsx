@@ -4,8 +4,8 @@ export default function StatusBadge({ status }: { status: UnitStatus }) {
   const meta = STATUS_META[status];
   return (
     <span
-      className="inline-flex shrink-0 items-center rounded-full px-2 py-0.5 text-xs font-medium"
-      style={{ color: meta.color, backgroundColor: `${meta.color}1A` }}
+      className="inline-flex shrink-0 items-center rounded-full border border-separator bg-card px-2.5 py-1 text-xs font-medium shadow-[var(--cirrus-shadow-1)]"
+      style={{ color: meta.color }}
     >
       {meta.label}
     </span>

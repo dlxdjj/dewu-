@@ -10,7 +10,7 @@ export default function EmptyState({
   subtitle?: string;
 }) {
   return (
-    <div className="flex flex-col items-center py-12 text-center">
+    <div className="flex flex-col items-center py-10 text-center">
       {icon && <div className="mb-3 text-muted">{icon}</div>}
       <p className="text-[15px] font-medium">{title}</p>
       {subtitle && (

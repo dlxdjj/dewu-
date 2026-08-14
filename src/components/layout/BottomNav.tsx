@@ -25,9 +25,9 @@ export default function BottomNav() {
   return (
     <nav
       aria-label="主导航"
-      className="fixed inset-x-0 bottom-0 z-50 border-t border-separator bg-card/95 backdrop-blur"
+      className="fixed inset-x-3 bottom-[calc(0.625rem+env(safe-area-inset-bottom))] z-50 mx-auto max-w-3xl rounded-full border border-separator bg-card/95 p-1.5 shadow-[var(--cirrus-shadow-2)] backdrop-blur-md"
     >
-      <div className="mx-auto flex max-w-3xl items-stretch px-4 pb-[env(safe-area-inset-bottom)]">
+      <div className="flex items-stretch">
         {tabs.map(({ href, label, Icon }) => {
           const active =
             href === "/" ? pathname === "/" : pathname.startsWith(href);
@@ -36,8 +36,8 @@ export default function BottomNav() {
               key={href}
               href={href}
               aria-current={active ? "page" : undefined}
-              className={`flex min-h-14 flex-1 flex-col items-center justify-center gap-1 rounded-lg transition-colors ${
-                active ? "text-tint" : "text-muted"
+              className={`flex min-h-14 flex-1 flex-col items-center justify-center gap-1 rounded-full transition-colors ${
+                active ? "bg-label text-card shadow-[var(--cirrus-shadow-2)]" : "text-muted active:bg-background"
               }`}
             >
               <Icon size={25} strokeWidth={active ? 2 : 1.6} />

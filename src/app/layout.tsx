@@ -20,7 +20,7 @@ export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
   viewportFit: "cover",
-  themeColor: "#F2F2F7",
+  themeColor: "#B8D4F1",
 };
 
 export default function RootLayout({
@@ -31,11 +31,10 @@ export default function RootLayout({
   return (
     <html lang="zh-CN">
       <body className="min-h-dvh">
-        {/* 内容区：移动端单列，底部预留导航高度 */}
         <DataSourceGate>
           <PwaBootstrap />
           <AppDataProvider>
-            <main className="mx-auto w-full max-w-3xl px-4 pb-32 pt-[calc(1.5rem+env(safe-area-inset-top))]">{children}</main>
+            <main className="app-main mx-auto w-full max-w-3xl px-4 pb-36 pt-[calc(1.5rem+env(safe-area-inset-top))]">{children}</main>
             <BottomNav />
           </AppDataProvider>
         </DataSourceGate>

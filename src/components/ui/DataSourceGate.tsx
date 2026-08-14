@@ -198,7 +198,7 @@ function GateCard({
   onLogin?: () => void;
 }) {
   return (
-    <div className="mx-auto mt-20 max-w-sm rounded-2xl bg-card p-6 text-center shadow-sm">
+    <div className="mx-auto mt-20 max-w-sm rounded-[28px] border border-separator bg-card p-6 text-center shadow-[var(--cirrus-shadow-2)]">
       <h1 className="text-lg font-semibold">{title}</h1>
       <p className="mt-2 text-sm leading-6 text-muted">{detail}</p>
       {(onRetry || onLogin) && (

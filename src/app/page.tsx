@@ -130,6 +130,7 @@ export default function HomePage({
                 ? `含返利 ${formatCents(displayed.monthlyRebateCents)}`
                 : "含返利收入"
             }
+            featured
           />
           {displayed?.monthlySalesCount === 0 && (
             <p
@@ -153,7 +154,7 @@ export default function HomePage({
             </div>
             <div className="mt-3 flex items-center justify-between gap-4 border-t border-separator pt-3">
               <p className="text-sm">返利收入</p>
-              <p className="shrink-0 text-lg font-semibold tabular-nums text-[#1B7F37]">
+              <p className="shrink-0 text-lg font-semibold tabular-nums text-[#21815C]">
                 {displayed ? formatCents(displayed.monthlyRebateCents) : "…"}
               </p>
             </div>
@@ -177,7 +178,7 @@ export default function HomePage({
               <Link
                 key={String(label)}
                 href={String(href)}
-                className="flex min-h-16 items-center justify-between rounded-2xl bg-card px-4 active:bg-separator"
+                className="flex min-h-16 items-center justify-between rounded-[28px] border border-separator bg-card px-4 shadow-[var(--cirrus-shadow-1)] active:bg-background"
               >
                 <span className="text-sm text-muted">{label}</span>
                 <span className="text-xl font-semibold tabular-nums">{count}</span>

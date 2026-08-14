@@ -19,7 +19,7 @@ import { todayStr } from "@/lib/utils/format";
 import { normalizeMoneyInput } from "@/lib/utils/money";
 
 const inputClass =
-  "w-full min-w-0 max-w-full box-border rounded-xl bg-background px-3 py-3 text-base";
+  "w-full min-w-0 max-w-full box-border rounded-full border border-separator bg-card px-4 py-3 text-base shadow-[var(--cirrus-shadow-1)]";
 
 interface PurchaseFormState {
   productName: string;
@@ -181,7 +181,7 @@ export default function PurchaseForm({
       <PageHeader title="添加" subtitle="录入采购并保存商品图片" />
       <Link
         href="/add/ocr"
-        className="mb-3 block rounded-2xl bg-card py-3 text-center text-sm text-tint"
+        className="mb-4 block rounded-full bg-label py-3.5 text-center text-sm font-medium text-card shadow-[var(--cirrus-shadow-2)]"
       >
         拍照识别订单截图（需人工确认）
       </Link>
@@ -337,14 +337,14 @@ export default function PurchaseForm({
               type="button"
               disabled={saving}
               onClick={retryImage}
-              className="rounded-xl bg-tint py-3 font-medium text-white disabled:opacity-40"
+              className="rounded-full bg-tint py-3 font-medium text-white shadow-[var(--cirrus-shadow-2)] disabled:opacity-40"
             >
               {saving ? "上传中…" : "重试上传图片"}
             </button>
             <button
               type="button"
               onClick={onComplete}
-              className="rounded-xl bg-card py-3 font-medium text-tint"
+              className="rounded-full border border-separator bg-card py-3 font-medium text-tint shadow-[var(--cirrus-shadow-1)]"
             >
               先去库存
             </button>
@@ -353,7 +353,7 @@ export default function PurchaseForm({
           <button
             type="submit"
             disabled={saving}
-            className="mt-4 w-full rounded-xl bg-tint py-3 font-medium text-white disabled:opacity-40"
+            className="mt-4 w-full rounded-full bg-tint py-3.5 font-medium text-white shadow-[var(--cirrus-shadow-2)] disabled:opacity-40"
           >
             {saving
               ? "保存中…"

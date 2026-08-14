@@ -39,13 +39,13 @@ export default function GroupCard({
     .map((platform) => PLATFORM_LABELS[platform])
     .join(" · ");
   const settlementUnits = group.units.filter((unit) => unit.status === "sold");
-  const className = `flex min-w-0 w-full max-w-full gap-3 overflow-hidden rounded-2xl bg-card p-4 text-left shadow-[0_1px_2px_rgba(0,0,0,0.05)] active:bg-background ${
+  const className = `flex min-w-0 w-full max-w-full gap-3 overflow-hidden rounded-[28px] border border-separator bg-card p-4 text-left shadow-[var(--cirrus-shadow-1)] active:bg-background ${
     selected ? "ring-2 ring-tint" : ""
   }`;
 
   const content = (
     <>
-      <div className="flex h-[72px] w-[72px] shrink-0 items-center justify-center overflow-hidden rounded-xl bg-background text-muted">
+      <div className="flex h-[72px] w-[72px] shrink-0 items-center justify-center overflow-hidden rounded-[20px] bg-background text-muted">
         {imageUrl ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img
@@ -62,7 +62,7 @@ export default function GroupCard({
           <p className="min-w-0 truncate text-base font-semibold leading-6">
             {group.product.name}
           </p>
-          <span className="shrink-0 rounded-full bg-label px-2.5 py-0.5 text-sm font-semibold text-card">
+          <span className="shrink-0 rounded-full bg-label px-2.5 py-1 text-sm font-semibold text-card shadow-[var(--cirrus-shadow-2)]">
             ×{group.units.length}
           </span>
         </div>
@@ -112,7 +112,7 @@ export default function GroupCard({
   }
 
   return (
-    <article className="min-w-0 overflow-hidden rounded-2xl bg-card shadow-[0_1px_2px_rgba(0,0,0,0.05)]">
+    <article className="min-w-0 overflow-hidden rounded-[28px] border border-separator bg-card shadow-[var(--cirrus-shadow-1)]">
       <Link
         href={`/inventory/group?${groupQuery(group, platformFilter, statusScope)}`}
         className="flex min-w-0 w-full max-w-full gap-3 overflow-hidden p-4 text-left active:bg-background"
@@ -124,7 +124,7 @@ export default function GroupCard({
           <button
             type="button"
             onClick={() => onSettle(settlementUnits)}
-            className="min-h-11 w-full rounded-xl bg-[#E8F3EA] px-3 text-[15px] font-medium text-[#1B7F37]"
+            className="min-h-11 w-full rounded-full bg-label px-3 text-[15px] font-medium text-card"
           >
             录到手价 · {settlementUnits.length} 件待结算
           </button>

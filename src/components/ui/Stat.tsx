@@ -5,11 +5,13 @@ export default function Stat({
   value,
   hint,
   compact = false,
+  featured = false,
 }: {
   label: string;
   value: string;
   hint?: string;
   compact?: boolean;
+  featured?: boolean;
 }) {
   const compactValueSize =
     value.length >= 11
@@ -20,13 +22,13 @@ export default function Stat({
 
   return (
     <Card
-      className={
+      className={`${featured ? "bg-label text-card" : ""} ${
         compact
-          ? "min-w-0 overflow-hidden px-2 py-4 text-center"
+          ? "min-w-0 overflow-hidden px-3 py-4 text-center"
           : "min-w-0 overflow-hidden"
-      }
+      }`}
     >
-      <p className="truncate text-[13px] text-muted">{label}</p>
+      <p className={`truncate text-[13px] ${featured ? "text-card/70" : "text-muted"}`}>{label}</p>
       <p
         className={`mt-1 whitespace-nowrap font-semibold leading-none tabular-nums ${
           compact
@@ -37,7 +39,7 @@ export default function Stat({
         {value}
       </p>
       {hint && (
-        <p className="mt-1.5 truncate text-[11px] text-muted">{hint}</p>
+        <p className={`mt-1.5 truncate text-[11px] ${featured ? "text-card/70" : "text-muted"}`}>{hint}</p>
       )}
     </Card>
   );

@@ -211,22 +211,22 @@ export default function InventoryPage({
           <button
             type="button"
             onClick={() => selecting ? resetSelection() : setSelecting(true)}
-            className="min-h-11 shrink-0 rounded-full bg-card px-4 text-[15px]"
+            className="min-h-11 shrink-0 rounded-full border border-separator bg-card px-4 text-[15px] shadow-[var(--cirrus-shadow-1)]"
           >
             {selecting ? "退出批量" : "批量操作"}
           </button>
         )}
       </div>
 
-      <nav aria-label="库存分类" className="no-scrollbar mb-3 flex gap-2 overflow-x-auto pb-1">
+      <nav aria-label="库存分类" className="no-scrollbar mb-4 flex gap-1 overflow-x-auto rounded-full border border-separator bg-card p-1 shadow-[var(--cirrus-shadow-1)]">
         {VIEWS.map((item) => (
           <button
             key={item.value}
             type="button"
             aria-pressed={view === item.value}
             onClick={() => switchView(item.value)}
-            className={`min-h-11 shrink-0 rounded-full px-4 text-[15px] ${
-              view === item.value ? "bg-label text-card" : "bg-card text-label"
+            className={`min-h-11 shrink-0 rounded-full px-4 text-[15px] transition-colors ${
+              view === item.value ? "bg-label text-card shadow-[var(--cirrus-shadow-2)]" : "text-muted"
             }`}
           >
             {item.label} {viewCounts[item.value]}
@@ -244,13 +244,13 @@ export default function InventoryPage({
               value={query}
               onChange={(event) => setQuery(event.target.value)}
               placeholder="搜索品名、货号、尺码、订单号"
-              className="min-h-12 w-full min-w-0 rounded-2xl bg-card px-4 text-base outline-none placeholder:text-muted"
+              className="min-h-12 w-full min-w-0 rounded-full border border-separator bg-card px-4 text-base shadow-[var(--cirrus-shadow-1)] outline-none placeholder:text-muted"
             />
           </label>
           <button
             type="button"
             onClick={() => setFilterOpen(true)}
-            className="min-h-12 shrink-0 rounded-2xl bg-card px-4 text-[15px]"
+            className="min-h-12 shrink-0 rounded-full border border-separator bg-card px-4 text-[15px] shadow-[var(--cirrus-shadow-1)]"
           >
             筛选{activeFilterCount ? ` ${activeFilterCount}` : ""}
           </button>
@@ -308,13 +308,13 @@ export default function InventoryPage({
       {selecting && (
         <>
           <div aria-hidden="true" className="h-32" />
-          <div className="fixed inset-x-0 bottom-[calc(56px+env(safe-area-inset-bottom))] z-40 border-t border-separator bg-card p-3">
-            <div className="mx-auto flex max-w-3xl flex-col gap-2">
+          <div className="fixed inset-x-3 bottom-[calc(78px+env(safe-area-inset-bottom))] z-40 mx-auto max-w-3xl rounded-[28px] border border-separator bg-card p-3 shadow-[var(--cirrus-shadow-2)]">
+            <div className="flex flex-col gap-2">
               <span className="text-center text-sm text-muted">已选 {selected.size} 件</span>
               {actionError && <p role="alert" className="rounded-lg bg-danger/10 px-3 py-2 text-sm text-danger">{actionError}</p>}
               <div className="grid grid-cols-2 gap-2">
                 <button disabled={!selected.size} onClick={() => prepareShipping(chosen)} className="min-h-11 rounded-xl bg-tint text-[15px] text-white disabled:opacity-40">批量寄出</button>
-                <button disabled={!selected.size} onClick={() => prepareSettlement(chosen)} className="min-h-11 rounded-xl bg-[#1B7F37] text-[15px] text-white disabled:opacity-40">批量录到手价</button>
+                <button disabled={!selected.size} onClick={() => prepareSettlement(chosen)} className="min-h-11 rounded-xl bg-label text-[15px] text-white disabled:opacity-40">批量录到手价</button>
               </div>
               <div className="flex gap-2">
                 <select aria-label="目标状态" value={target} onChange={(event) => setTarget(event.target.value as UnitStatus)} className="min-h-11 min-w-0 flex-1 rounded-xl bg-background px-3 text-[15px]">

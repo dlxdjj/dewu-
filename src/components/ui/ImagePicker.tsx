@@ -79,7 +79,7 @@ export default function ImagePicker({
         type="button"
         disabled={processing}
         onClick={() => inputRef.current?.click()}
-        className={`relative flex w-full items-center justify-center overflow-hidden rounded-xl border border-dashed border-separator bg-background text-muted active:bg-separator/40 disabled:opacity-60 ${
+        className={`relative flex w-full items-center justify-center overflow-hidden rounded-[22px] border border-dashed border-separator bg-background text-muted shadow-inner active:bg-separator/40 disabled:opacity-60 ${
           preview ? "h-44" : "h-24"
         }`}
       >
@@ -109,7 +109,7 @@ export default function ImagePicker({
         </p>
       )}
       {!processing && hasAutoCrop && (
-        <div className="mt-2 flex min-h-11 items-center justify-between gap-3 rounded-xl bg-[#E8F3EA] px-3 py-2 text-xs text-[#1B7F37]">
+        <div className="mt-2 flex min-h-11 items-center justify-between gap-3 rounded-[20px] bg-background px-3 py-2 text-xs text-label">
           <span>{usingOriginal ? "当前使用原图" : "已自动裁去截图黑边"}</span>
           <button
             type="button"

@@ -18,13 +18,13 @@ export default function Sheet({
   return (
     <div className="fixed inset-0 z-[60] flex items-end justify-center">
       <div
-        className="absolute inset-0 bg-black/30"
+        className="absolute inset-0 bg-black/25 backdrop-blur-[2px]"
         onClick={onClose}
         aria-hidden
       />
-      <div className="relative max-h-[88dvh] w-full max-w-lg overflow-y-auto rounded-t-2xl bg-card px-4 pb-[calc(16px+env(safe-area-inset-bottom))] pt-3">
-        <div className="mx-auto mb-2 h-1 w-9 rounded-full bg-separator" />
-        <h3 className="mb-3 text-center text-[16px] font-semibold">{title}</h3>
+      <div className="relative max-h-[88dvh] w-[calc(100%_-_1rem)] max-w-lg overflow-y-auto rounded-t-[28px] border border-b-0 border-separator bg-card px-5 pb-[calc(20px+env(safe-area-inset-bottom))] pt-3 shadow-[var(--cirrus-shadow-2)]">
+        <div className="mx-auto mb-3 h-1 w-10 rounded-full bg-separator" />
+        <h3 className="mb-4 text-center text-[18px] font-semibold tracking-[-0.02em]">{title}</h3>
         {children}
       </div>
     </div>

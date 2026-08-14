@@ -23,7 +23,7 @@ export default function Field({
 
 /** 统一输入框样式（16px 字号避免 iOS 聚焦自动放大） */
 export const inputCls =
-  "w-full rounded-xl bg-background px-3 py-2.5 text-[16px] placeholder:text-muted focus:ring-2 focus:ring-tint/40";
+  "w-full rounded-full border border-separator bg-card px-4 py-2.5 text-[16px] shadow-[var(--cirrus-shadow-1)] placeholder:text-muted focus:ring-2 focus:ring-tint/40";
 
 /** 金额输入框：调起手机数字键盘 */
 export const moneyInputProps = {

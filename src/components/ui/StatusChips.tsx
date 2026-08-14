@@ -24,7 +24,7 @@ export default function StatusChips({
             className={`rounded-full px-3.5 py-2 text-[13px] ${
               active
                 ? "font-semibold text-white"
-                : "bg-card text-label shadow-[0_1px_2px_rgba(0,0,0,0.05)] active:bg-background"
+                : "border border-separator bg-card text-label shadow-[var(--cirrus-shadow-1)] active:bg-background"
             }`}
             style={active ? { backgroundColor: meta.color } : undefined}
           >
