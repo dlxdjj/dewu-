@@ -10,7 +10,7 @@ export const metadata: Metadata = {
   description: "个人商品进销存与利润管理",
   appleWebApp: {
     capable: true,
-    statusBarStyle: "default",
+    statusBarStyle: "black-translucent",
     title: "进销存",
   },
   formatDetection: { telephone: false },
