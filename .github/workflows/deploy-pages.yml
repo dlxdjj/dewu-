@@ -31,7 +31,7 @@ jobs:
       - run: npm run lint
       - run: npm run test:coverage -- --run
       - run: npm run pages:check
-      - run: npx playwright install --with-deps chromium
+      - run: npx playwright install --with-deps chromium webkit
       - run: npm run e2e:all
 
   deploy:
