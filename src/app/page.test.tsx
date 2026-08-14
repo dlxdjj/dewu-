@@ -6,12 +6,16 @@ const dataMocks = vi.hoisted(() => ({
   listUnits: vi.fn(),
   listSales: vi.fn(),
   listRebates: vi.fn(),
+  listShippingEvents: vi.fn(),
+  listShippingEventItems: vi.fn(),
 }));
 
 const dataSource = {
   listUnits: dataMocks.listUnits,
   listSales: dataMocks.listSales,
   listRebates: dataMocks.listRebates,
+  listShippingEvents: dataMocks.listShippingEvents,
+  listShippingEventItems: dataMocks.listShippingEventItems,
 };
 
 describe("HomePage", () => {
@@ -29,6 +33,8 @@ describe("HomePage", () => {
         updated_at: "2026-08-01T00:00:00Z",
       },
     ]);
+    dataMocks.listShippingEvents.mockResolvedValue([]);
+    dataMocks.listShippingEventItems.mockResolvedValue([]);
 
     render(
       <HomePage
@@ -39,14 +45,14 @@ describe("HomePage", () => {
 
     expect(await screen.findByText("库存数量")).toBeInTheDocument();
     expect(screen.getByText("库存成本")).toBeInTheDocument();
-    expect(screen.getByText("8月销量")).toBeInTheDocument();
+    expect(screen.getByText("8月销售额")).toBeInTheDocument();
     expect(screen.getByText("8月利润")).toBeInTheDocument();
     expect(screen.queryByText("有效库存")).not.toBeInTheDocument();
     expect(screen.queryByText("库存资金")).not.toBeInTheDocument();
     expect(screen.queryByText("未结算")).not.toBeInTheDocument();
     expect(screen.queryByText(/利润唯一口径/)).not.toBeInTheDocument();
     expect(screen.queryByText("…")).not.toBeInTheDocument();
-    expect(screen.getByText("¥30.00")).toBeInTheDocument();
+    expect(screen.getAllByText("¥30.00")).toHaveLength(2);
     expect(screen.getByText("含返利 ¥30.00")).toBeInTheDocument();
     expect(
       screen.getByText("本月暂无已结算销售；当前利润来自返利收入。"),
@@ -57,6 +63,8 @@ describe("HomePage", () => {
     dataMocks.listUnits.mockRejectedValue(new Error("读取数据库超时"));
     dataMocks.listSales.mockResolvedValue([]);
     dataMocks.listRebates.mockResolvedValue([]);
+    dataMocks.listShippingEvents.mockResolvedValue([]);
+    dataMocks.listShippingEventItems.mockResolvedValue([]);
 
     render(
       <HomePage

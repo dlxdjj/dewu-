@@ -20,6 +20,8 @@ import type {
   Product,
   PurchaseBatch,
   Sale,
+  ShippingEvent,
+  ShippingEventItem,
   StatusHistory,
   StorageDeletionJob,
 } from "@/lib/types/database";
@@ -31,6 +33,8 @@ export interface MemoryState {
   units: InventoryUnit[];
   sales: Sale[];
   rebates: MonthlyRebate[];
+  shippingEvents: ShippingEvent[];
+  shippingEventItems: ShippingEventItem[];
   history: StatusHistory[];
   attachments: Attachment[];
   cleanupJobs: StorageDeletionJob[];
@@ -52,6 +56,8 @@ export class MemoryDbAdapter implements DbAdapter {
       units: seed.units ?? [],
       sales: seed.sales ?? [],
       rebates: seed.rebates ?? [],
+      shippingEvents: seed.shippingEvents ?? [],
+      shippingEventItems: seed.shippingEventItems ?? [],
       history: seed.history ?? [],
       attachments: seed.attachments ?? [],
       cleanupJobs: seed.cleanupJobs ?? [],
@@ -103,6 +109,14 @@ export class MemoryDbAdapter implements DbAdapter {
 
   async listRebates() {
     return clone(this.state.rebates);
+  }
+
+  async listShippingEvents() {
+    return clone(this.state.shippingEvents);
+  }
+
+  async listShippingEventItems() {
+    return clone(this.state.shippingEventItems);
   }
 
   async listHistory(unitId?: string) {
@@ -249,8 +263,8 @@ export class MemoryDbAdapter implements DbAdapter {
       const overwrittenUnitIds = valid
         .filter((unit) => unit.outbound_shipping_cents > 0)
         .map((unit) => unit.id);
-      if (overwrittenUnitIds.length && !input.overwriteConfirmed) {
-        throw new Error("存在旧分摊值，请确认覆盖");
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(input.shippedAt)) {
+        throw new Error("寄出日期格式不正确");
       }
       const allocations = allocateShippingCents(
         valid.map((unit) => ({
@@ -261,11 +275,38 @@ export class MemoryDbAdapter implements DbAdapter {
         input.totalShippingCents,
       );
 
+      const timestamp = now();
+      if (input.mode === "replace") {
+        for (const item of draft.shippingEventItems) {
+          if (item.active && unique.has(item.unit_id)) {
+            item.active = false;
+            item.voided_at = timestamp;
+            mutate();
+          }
+        }
+      }
+      const event: ShippingEvent = {
+        id: id(),
+        user_id: "test-user",
+        shipped_at: input.shippedAt,
+        total_shipping_cents: input.totalShippingCents,
+        mode: input.mode,
+        estimated: false,
+        note: null,
+        created_at: timestamp,
+        updated_at: timestamp,
+      };
+      draft.shippingEvents.push(event);
+      mutate();
+
       for (const allocation of allocations) {
         const unit = valid.find((row) => row.id === allocation.unitId)!;
         const from = unit.status;
         draft.sales = draft.sales.filter((row) => row.unit_id !== unit.id);
-        unit.outbound_shipping_cents = allocation.shippingCents;
+        unit.outbound_shipping_cents =
+          input.mode === "append"
+            ? unit.outbound_shipping_cents + allocation.shippingCents
+            : allocation.shippingCents;
         unit.status = "shipping";
         unit.updated_at = now();
         draft.history.push({
@@ -274,12 +315,22 @@ export class MemoryDbAdapter implements DbAdapter {
           unit_id: unit.id,
           from_status: from,
           to_status: "shipping",
-          note: overwrittenUnitIds.includes(unit.id)
-            ? "覆盖寄出运费"
+          note: input.mode === "replace" && overwrittenUnitIds.includes(unit.id)
+            ? "纠正累计寄出运费"
             : valid.length === 1
               ? "单件寄出"
               : "批量寄出",
-          created_at: now(),
+          created_at: timestamp,
+        });
+        draft.shippingEventItems.push({
+          id: id(),
+          user_id: unit.user_id,
+          event_id: event.id,
+          unit_id: unit.id,
+          allocated_shipping_cents: allocation.shippingCents,
+          active: true,
+          voided_at: null,
+          created_at: timestamp,
         });
         mutate();
       }
@@ -500,6 +551,15 @@ export class MemoryDbAdapter implements DbAdapter {
       });
       draft.sales = draft.sales.filter((row) => row.unit_id !== unit.id);
       draft.history = draft.history.filter((row) => row.unit_id !== unit.id);
+      draft.shippingEventItems = draft.shippingEventItems.filter(
+        (row) => row.unit_id !== unit.id,
+      );
+      const usedEventIds = new Set(
+        draft.shippingEventItems.map((row) => row.event_id),
+      );
+      draft.shippingEvents = draft.shippingEvents.filter((row) =>
+        usedEventIds.has(row.id),
+      );
       draft.units = draft.units.filter((row) => row.id !== unit.id);
 
       let deletedBatch = false;
@@ -589,6 +649,8 @@ export class MemoryDbAdapter implements DbAdapter {
       draft.units = [];
       draft.sales = [];
       draft.rebates = [];
+      draft.shippingEvents = [];
+      draft.shippingEventItems = [];
       draft.history = [];
       draft.attachments = [];
       mutate();

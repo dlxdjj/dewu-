@@ -79,6 +79,8 @@ describe("buildHomeSummary", () => {
         rebate("jingfen", 2000, "2026-08"),
         rebate("jingfen", 9000, "2026-07"),
       ],
+      [],
+      [],
       new Date("2026-08-04T12:00:00+02:00"),
     );
 
@@ -88,8 +90,17 @@ describe("buildHomeSummary", () => {
       month: "2026-08",
       monthLabel: "8月",
       monthlySalesCount: 1,
+      monthlySalesCents: 12000,
+      monthlyShippingCents: 0,
       monthlyRebateCents: 3000,
       monthlyProfitCents: 6500,
+      todoCounts: {
+        pending: 0,
+        shipping: 0,
+        in_stock_dewu: 0,
+        sold: 0,
+        returned: 0,
+      },
     });
   });
 
@@ -101,6 +112,8 @@ describe("buildHomeSummary", () => {
       buildHomeSummary(
         [unit("sold", "sold", 8000, 0)],
         [pendingSale],
+        [],
+        [],
         [],
         new Date("2026-08-04T12:00:00+02:00"),
       ).monthlySalesCount,

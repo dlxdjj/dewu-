@@ -22,7 +22,7 @@ export default function Sheet({
         onClick={onClose}
         aria-hidden
       />
-      <div className="relative w-full max-w-lg rounded-t-2xl bg-card px-4 pb-[calc(16px+env(safe-area-inset-bottom))] pt-3">
+      <div className="relative max-h-[88dvh] w-full max-w-lg overflow-y-auto rounded-t-2xl bg-card px-4 pb-[calc(16px+env(safe-area-inset-bottom))] pt-3">
         <div className="mx-auto mb-2 h-1 w-9 rounded-full bg-separator" />
         <h3 className="mb-3 text-center text-[16px] font-semibold">{title}</h3>
         {children}

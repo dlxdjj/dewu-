@@ -192,11 +192,12 @@ function Detail() {
         <BatchShippingSheet
           units={[unit]}
           onClose={() => setShipping(false)}
-          onConfirm={async (totalShippingCents, overwriteConfirmed) => {
+          onConfirm={async (totalShippingCents, mode, shippedAt) => {
             await shipUnits(getDb(), {
               unitIds: [unit.id],
               totalShippingCents,
-              overwriteConfirmed,
+              mode,
+              shippedAt,
             });
             setShipping(false);
             await load();

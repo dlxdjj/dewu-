@@ -13,9 +13,12 @@ import type {
   Product,
   PurchaseBatch,
   Sale,
+  ShippingEvent,
+  ShippingEventItem,
   StatusHistory,
 } from "@/lib/types/database";
 import { DataAccessError, withDataTimeout } from "@/lib/data/errors";
+import { cachedRead, invalidateDataCache } from "@/lib/data/cache";
 
 const BUCKET = "attachments";
 
@@ -47,6 +50,22 @@ async function requestVoid(
 /** Create the authenticated Supabase data adapter. */
 export function createSupabaseAdapter(): DbAdapter {
   const client = getSupabase();
+  let namespacePromise: Promise<string> | null = null;
+  const cacheNamespace = () => {
+    if (!client.auth?.getSession) return Promise.resolve("adapter-default");
+    namespacePromise ??= withDataTimeout(client.auth.getSession()).then(({ data, error }) => {
+      if (error) throw new DataAccessError(error.message, false);
+      return data.session?.user.id ?? "signed-out";
+    });
+    return namespacePromise;
+  };
+  const cached = async <T>(key: string, loader: () => Promise<T>): Promise<T> =>
+    cachedRead(await cacheNamespace(), key, loader);
+  const afterMutation = async <T>(work: Promise<T>): Promise<T> => {
+    const result = await work;
+    await invalidateDataCache(await cacheNamespace());
+    return result;
+  };
   const rpc = async <T>(
     name: string,
     params: Record<string, unknown>,
@@ -77,14 +96,14 @@ export function createSupabaseAdapter(): DbAdapter {
 
   return {
     kind: "supabase",
-    listProducts: () =>
+    listProducts: () => cached("products", () =>
       request<Product[]>(
         client
           .from("products")
           .select("*")
           .order("created_at") as PromiseLike<QueryResponse<Product[]>>,
-      ),
-    listBatches: () =>
+      )),
+    listBatches: () => cached("batches", () =>
       request<PurchaseBatch[]>(
         client
           .from("purchase_batches")
@@ -92,8 +111,8 @@ export function createSupabaseAdapter(): DbAdapter {
           .order("purchased_at", { ascending: false }) as PromiseLike<
           QueryResponse<PurchaseBatch[]>
         >,
-      ),
-    listUnits: () =>
+      )),
+    listUnits: () => cached("units", () =>
       request<InventoryUnit[]>(
         client
           .from("inventory_units")
@@ -101,25 +120,37 @@ export function createSupabaseAdapter(): DbAdapter {
           .order("created_at", { ascending: false }) as PromiseLike<
           QueryResponse<InventoryUnit[]>
         >,
-      ),
-    listSales: () =>
+      )),
+    listSales: () => cached("sales", () =>
       request<Sale[]>(
         client.from("sales").select("*") as PromiseLike<QueryResponse<Sale[]>>,
-      ),
+      )),
     async listRebates() {
-      const response = await withDataTimeout(
-        client
-          .from("monthly_rebates")
-          .select("*")
-          .order("month", { ascending: false }) as PromiseLike<
-          QueryResponse<MonthlyRebate[]>
-        >,
-      );
-      // Keep existing deployments readable while 0005 is being applied.
-      if (["42P01", "PGRST205"].includes(response.error?.code ?? "")) {
-        return [];
-      }
-      return unwrap(response.data, response.error);
+      return cached("rebates", async () => {
+        const response = await withDataTimeout(
+          client.from("monthly_rebates").select("*").order("month", { ascending: false }) as PromiseLike<QueryResponse<MonthlyRebate[]>>,
+        );
+        if (["42P01", "PGRST205"].includes(response.error?.code ?? "")) return [];
+        return unwrap(response.data, response.error);
+      });
+    },
+    async listShippingEvents() {
+      return cached("shipping-events", async () => {
+        const response = await withDataTimeout(
+          client.from("shipping_events").select("*").order("shipped_at", { ascending: false }) as PromiseLike<QueryResponse<ShippingEvent[]>>,
+        );
+        if (["42P01", "PGRST205"].includes(response.error?.code ?? "")) return [];
+        return unwrap(response.data, response.error);
+      });
+    },
+    async listShippingEventItems() {
+      return cached("shipping-event-items", async () => {
+        const response = await withDataTimeout(
+          client.from("shipping_event_items").select("*") as PromiseLike<QueryResponse<ShippingEventItem[]>>,
+        );
+        if (["42P01", "PGRST205"].includes(response.error?.code ?? "")) return [];
+        return unwrap(response.data, response.error);
+      });
     },
     listHistory: (unitId) => {
       let query = client
@@ -187,53 +218,56 @@ export function createSupabaseAdapter(): DbAdapter {
         throw reason;
       }
     },
-    createPurchase: (input) =>
+    createPurchase: (input) => afterMutation(
       rpc<PurchaseResult>("create_purchase_simple", { p_input: input }),
+    ),
     shipUnits: (input) =>
-      rpc<ShipUnitsResult>("ship_units", {
+      afterMutation(rpc<ShipUnitsResult>("record_shipment", {
         p_unit_ids: input.unitIds,
         p_total_shipping_cents: input.totalShippingCents,
-        p_overwrite_confirmed: input.overwriteConfirmed,
-      }),
+        p_mode: input.mode,
+        p_shipped_at: input.shippedAt,
+      })),
     async settleUnits(input) {
-      await rpcVoid("settle_units", {
+      await afterMutation(rpcVoid("settle_units", {
         p_unit_ids: input.unitIds,
         p_actual_payout_cents: input.actualPayoutCents,
         p_settled_at: input.settledAt,
-      });
+      }));
     },
     async changeStatus(input) {
-      await rpcVoid("change_units_status", {
+      await afterMutation(rpcVoid("change_units_status", {
         p_unit_ids: input.unitIds,
         p_to_status: input.toStatus,
         p_note: input.note ?? null,
-      });
+      }));
     },
     async refundUnit(input) {
-      await rpcVoid("refund_unit", {
+      await afterMutation(rpcVoid("refund_unit", {
         p_unit_id: input.unitId,
         p_note: input.note ?? null,
-      });
+      }));
     },
-    saveMonthlyRebates: (input) =>
+    saveMonthlyRebates: (input) => afterMutation(
       rpc<MonthlyRebate[]>("save_monthly_rebates", {
         p_month: input.month,
         p_taobao_alliance_cents: input.taobaoAllianceCents,
         p_jingfen_cents: input.jingfenCents,
       }),
+    ),
     async deleteUnitDeep(input) {
-      return removePending(
+      return afterMutation(removePending(
         await rpc<DeleteResult>("delete_unit_deep", {
           p_unit_id: input.unitId,
         }),
-      );
+      ));
     },
     async clearAllData(input) {
-      return removePending(
+      return afterMutation(removePending(
         await rpc<ClearResult>("clear_all_data", {
           p_confirmation: input.confirmation,
         }),
-      );
+      ));
     },
     async retryStorageCleanup() {
       const rows = await request<{ path: string }[]>(

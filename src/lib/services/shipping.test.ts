@@ -1,3 +1,63 @@
-import { describe,expect,it } from "vitest";import { allocateShippingCents } from "./shipping";import { MemoryDbAdapter } from "@/lib/data/memory";
-const candidates=[{id:"b",createdAt:"2026-01-01T00:00:00Z",currentShippingCents:0},{id:"a",createdAt:"2026-01-01T00:00:00Z",currentShippingCents:0},{id:"c",createdAt:"2026-01-02T00:00:00Z",currentShippingCents:0}];
-describe("shipping",()=>{it("allocates stable integer cents",()=>expect(allocateShippingCents(candidates,1000)).toEqual([{unitId:"a",shippingCents:334},{unitId:"b",shippingCents:333},{unitId:"c",shippingCents:333}]));it("conserves small totals",()=>expect(allocateShippingCents(candidates,2).reduce((s,x)=>s+x.shippingCents,0)).toBe(2));it("rolls back injected failures",async()=>{const db=new MemoryDbAdapter();const purchase=await db.createPurchase({productName:"鞋",styleCode:"STYLE-SHIP-1",platform:"taobao",unitPriceCents:10000,quantity:3,purchasedAt:"2026-01-01",size:"42",initialStatus:"arrived",orderNo:"",note:""});const before=db.snapshot();db.injectFailureAfter(2);await expect(db.shipUnits({unitIds:purchase.unitIds,totalShippingCents:1000,overwriteConfirmed:false})).rejects.toThrow("注入事务故障");expect(db.snapshot()).toEqual(before);});it("sets every unit to shipping and records history",async()=>{const db=new MemoryDbAdapter();const purchase=await db.createPurchase({productName:"鞋",styleCode:"STYLE-SHIP-2",platform:"taobao",unitPriceCents:100,quantity:2,purchasedAt:"2026-01-01",size:"42",initialStatus:"returned",orderNo:"",note:""});await db.shipUnits({unitIds:purchase.unitIds,totalShippingCents:3,overwriteConfirmed:false});const snapshot=db.snapshot();expect(snapshot.units.every((unit)=>unit.status==="shipping")).toBe(true);expect(snapshot.units.map((unit)=>unit.outbound_shipping_cents).sort()).toEqual([1,2]);expect(snapshot.history.slice(-2).every((row)=>row.to_status==="shipping")).toBe(true);});it("requires overwrite confirmation",async()=>{const db=new MemoryDbAdapter();const p=await db.createPurchase({productName:"鞋",styleCode:"STYLE-SHIP-3",platform:"taobao",unitPriceCents:100,quantity:1,purchasedAt:"2026-01-01",size:"42",initialStatus:"arrived",orderNo:"",note:""});await db.shipUnits({unitIds:p.unitIds,totalShippingCents:10,overwriteConfirmed:false});await expect(db.shipUnits({unitIds:p.unitIds,totalShippingCents:20,overwriteConfirmed:false})).rejects.toThrow("确认覆盖");});});
+import { describe, expect, it } from "vitest";
+import { MemoryDbAdapter } from "@/lib/data/memory";
+import { allocateShippingCents } from "./shipping";
+
+const candidates = [
+  { id: "b", createdAt: "2026-01-01T00:00:00Z", currentShippingCents: 0 },
+  { id: "a", createdAt: "2026-01-01T00:00:00Z", currentShippingCents: 0 },
+  { id: "c", createdAt: "2026-01-02T00:00:00Z", currentShippingCents: 0 },
+];
+
+async function purchase(db: MemoryDbAdapter, quantity = 1) {
+  return db.createPurchase({
+    productName: "鞋", styleCode: `STYLE-SHIP-${quantity}-${crypto.randomUUID()}`,
+    platform: "taobao", unitPriceCents: 100, quantity,
+    purchasedAt: "2026-01-01", size: "42", initialStatus: "arrived",
+    orderNo: "", note: "",
+  });
+}
+
+describe("shipping", () => {
+  it("allocates stable integer cents", () => {
+    expect(allocateShippingCents(candidates, 1000)).toEqual([
+      { unitId: "a", shippingCents: 334 },
+      { unitId: "b", shippingCents: 333 },
+      { unitId: "c", shippingCents: 333 },
+    ]);
+  });
+
+  it("rolls back shipment and ledger together", async () => {
+    const db = new MemoryDbAdapter();
+    const created = await purchase(db, 3);
+    const before = db.snapshot();
+    db.injectFailureAfter(2);
+    await expect(db.shipUnits({
+      unitIds: created.unitIds, totalShippingCents: 1000,
+      mode: "append", shippedAt: "2026-08-14",
+    })).rejects.toThrow("注入事务故障");
+    expect(db.snapshot()).toEqual(before);
+  });
+
+  it("records dated allocations and supports append then correction", async () => {
+    const db = new MemoryDbAdapter();
+    const created = await purchase(db, 2);
+    await db.shipUnits({
+      unitIds: created.unitIds, totalShippingCents: 3,
+      mode: "append", shippedAt: "2026-08-10",
+    });
+    await db.shipUnits({
+      unitIds: created.unitIds, totalShippingCents: 5,
+      mode: "append", shippedAt: "2026-08-11",
+    });
+    expect(db.snapshot().units.map((unit) => unit.outbound_shipping_cents).sort()).toEqual([3, 5]);
+
+    await db.shipUnits({
+      unitIds: created.unitIds, totalShippingCents: 4,
+      mode: "replace", shippedAt: "2026-08-12",
+    });
+    const state = db.snapshot();
+    expect(state.units.map((unit) => unit.outbound_shipping_cents)).toEqual([2, 2]);
+    expect(state.shippingEventItems.filter((item) => item.active)).toHaveLength(2);
+    expect(state.shippingEvents).toHaveLength(3);
+  });
+});

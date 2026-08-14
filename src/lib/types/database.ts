@@ -25,6 +25,21 @@ export interface MonthlyRebate extends OwnedRow {
   amount_cents: number;
   updated_at: string;
 }
+export interface ShippingEvent extends OwnedRow {
+  shipped_at: string;
+  total_shipping_cents: number;
+  mode: "append" | "replace";
+  estimated: boolean;
+  note: string | null;
+  updated_at: string;
+}
+export interface ShippingEventItem extends OwnedRow {
+  event_id: string;
+  unit_id: string;
+  allocated_shipping_cents: number;
+  active: boolean;
+  voided_at: string | null;
+}
 export type AttachmentOwner = "product" | "batch" | "unit" | "sale";
 export type AttachmentKind = "product_image" | "order_screenshot";
 export interface Attachment extends OwnedRow { owner_type: AttachmentOwner; owner_id: string; kind: AttachmentKind; path: string; content_type: string | null; }

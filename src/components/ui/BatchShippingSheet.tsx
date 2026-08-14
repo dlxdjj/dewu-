@@ -4,7 +4,8 @@ import { useMemo, useState } from "react";
 import Sheet from "./Sheet";
 import type { InventoryUnit } from "@/lib/types/database";
 import { previewShipping } from "@/lib/services/shipping";
-import { formatCents } from "@/lib/utils/money";
+import { todayStr } from "@/lib/utils/format";
+import { formatCents, normalizeMoneyInput } from "@/lib/utils/money";
 
 export default function BatchShippingSheet({
   units,
@@ -15,11 +16,13 @@ export default function BatchShippingSheet({
   onClose: () => void;
   onConfirm: (
     totalShippingCents: number,
-    overwriteConfirmed: boolean,
+    mode: "append" | "replace",
+    shippedAt: string,
   ) => Promise<void>;
 }) {
   const [amount, setAmount] = useState("");
-  const [overwrite, setOverwrite] = useState(false);
+  const [mode, setMode] = useState<"append" | "replace">("append");
+  const [shippedAt, setShippedAt] = useState(todayStr);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const single = units.length === 1;
@@ -46,13 +49,55 @@ export default function BatchShippingSheet({
             inputMode="decimal"
             value={amount}
             onChange={(event) => {
-              setAmount(event.target.value);
-              setOverwrite(false);
+              setAmount(normalizeMoneyInput(event.target.value));
             }}
             className="mt-1 w-full rounded-xl bg-background px-3 py-3 text-base"
             placeholder="0.00"
           />
         </label>
+
+        <label className="block min-w-0 text-sm">
+          寄出日期（必填）
+          <span className="date-input-shell mt-1">
+            <input
+              aria-label="寄出日期"
+              required
+              type="date"
+              value={shippedAt}
+              onChange={(event) => setShippedAt(event.target.value)}
+              className="mobile-date-input"
+            />
+          </span>
+        </label>
+
+        {preview?.hasOverwrite && (
+          <fieldset>
+            <legend className="text-sm">这批商品已有历史运费</legend>
+            <div className="mt-1 grid grid-cols-2 gap-2 rounded-xl bg-background p-1">
+              <button
+                type="button"
+                aria-pressed={mode === "append"}
+                onClick={() => setMode("append")}
+                className={`min-h-11 rounded-lg text-sm ${mode === "append" ? "bg-card font-medium shadow-sm" : "text-muted"}`}
+              >
+                追加本次运费
+              </button>
+              <button
+                type="button"
+                aria-pressed={mode === "replace"}
+                onClick={() => setMode("replace")}
+                className={`min-h-11 rounded-lg text-sm ${mode === "replace" ? "bg-card font-medium shadow-sm" : "text-muted"}`}
+              >
+                纠正累计运费
+              </button>
+            </div>
+            <p className="mt-1.5 text-xs leading-5 text-muted">
+              {mode === "append"
+                ? "保留过去运费，把本次金额继续计入成本和本月运费。"
+                : "用本次金额替换所选商品的累计运费，旧流水作废但保留审计记录。"}
+            </p>
+          </fieldset>
+        )}
 
         {preview && (
           <div className="rounded-xl bg-background p-3 text-sm">
@@ -75,16 +120,6 @@ export default function BatchShippingSheet({
           </div>
         )}
 
-        {preview?.hasOverwrite && !overwrite && (
-          <button
-            type="button"
-            onClick={() => setOverwrite(true)}
-            className="w-full rounded-xl bg-[#FFF3CD] py-3 text-sm text-[#8a6d00]"
-          >
-            确认覆盖原运费
-          </button>
-        )}
-
         {error && (
           <p role="alert" className="text-center text-sm text-danger">
             {error}
@@ -93,13 +128,13 @@ export default function BatchShippingSheet({
 
         <button
           type="button"
-          disabled={!preview || busy || (preview.hasOverwrite && !overwrite)}
+          disabled={!preview || busy || !shippedAt}
           onClick={async () => {
             if (!preview) return;
             setBusy(true);
             setError("");
             try {
-              await onConfirm(preview.totalShippingCents, overwrite);
+              await onConfirm(preview.totalShippingCents, mode, shippedAt);
             } catch (reason: unknown) {
               setError(reason instanceof Error ? reason.message : "寄出失败");
             } finally {

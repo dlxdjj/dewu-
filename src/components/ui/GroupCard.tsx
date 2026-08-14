@@ -7,6 +7,7 @@ import { formatCents } from "@/lib/utils/money";
 import {
   groupQuery,
   type PlatformFilter,
+  type GroupSelection,
   type UnitGroup,
 } from "@/lib/utils/group";
 import { BoxIcon } from "./icons";
@@ -19,6 +20,7 @@ export default function GroupCard({
   selected,
   onToggle,
   onSettle,
+  statusScope,
 }: {
   group: UnitGroup;
   imageUrl: string | null;
@@ -27,6 +29,7 @@ export default function GroupCard({
   selected: boolean;
   onToggle: () => void;
   onSettle?: (units: UnitGroup["units"]) => void;
+  statusScope?: GroupSelection["scope"];
 }) {
   const statuses = UNIT_STATUSES.flatMap((status) => {
     const count = group.statusCounts[status] ?? 0;
@@ -111,7 +114,7 @@ export default function GroupCard({
   return (
     <article className="min-w-0 overflow-hidden rounded-2xl bg-card shadow-[0_1px_2px_rgba(0,0,0,0.05)]">
       <Link
-        href={`/inventory/group?${groupQuery(group, platformFilter)}`}
+        href={`/inventory/group?${groupQuery(group, platformFilter, statusScope)}`}
         className="flex min-w-0 w-full max-w-full gap-3 overflow-hidden p-4 text-left active:bg-background"
       >
         {content}

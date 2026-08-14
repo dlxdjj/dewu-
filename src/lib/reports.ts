@@ -4,6 +4,8 @@ import type {
   Product,
   PurchaseBatch,
   Sale,
+  ShippingEvent,
+  ShippingEventItem,
 } from "@/lib/types/database";
 import { REBATE_SOURCE_LABELS } from "@/lib/constants/rebate";
 import { actualProfitCents } from "@/lib/utils/profit";
@@ -21,6 +23,7 @@ export interface SettlementSummary {
   rebateCents: number;
   salesCents: number;
   salesCount: number;
+  shippingCents: number;
 }
 
 export interface SettlementReport {
@@ -36,12 +39,15 @@ export interface ReportInput {
   batches: PurchaseBatch[];
   sales: Sale[];
   rebates: MonthlyRebate[];
+  shippingEvents: ShippingEvent[];
+  shippingEventItems: ShippingEventItem[];
   month: string;
 }
 
 function summarize(
   rows: ReportRow[],
   rebateCents: number,
+  shippingCents: number,
 ): SettlementSummary {
   return {
     profitCents: rows.reduce((sum, row) => sum + row.profit, 0) + rebateCents,
@@ -51,6 +57,7 @@ function summarize(
       0,
     ),
     salesCount: rows.length,
+    shippingCents,
   };
 }
 
@@ -93,10 +100,25 @@ export function buildSettlementReport(input: ReportInput): SettlementReport {
     (sum, rebate) => sum + rebate.amount_cents,
     0,
   );
+  const eventMap = new Map(
+    input.shippingEvents.map((event) => [event.id, event]),
+  );
+  const activeShipping = input.shippingEventItems.filter((item) => item.active);
+  const shippingCents = (month?: string) =>
+    activeShipping.reduce((sum, item) => {
+      const event = eventMap.get(item.event_id);
+      return event && (!month || event.shipped_at.startsWith(month))
+        ? sum + item.allocated_shipping_cents
+        : sum;
+    }, 0);
 
   return {
-    allTime: summarize(allRows, allRebateCents),
-    selectedMonth: summarize(rows, selectedRebateCents),
+    allTime: summarize(allRows, allRebateCents, shippingCents()),
+    selectedMonth: summarize(
+      rows,
+      selectedRebateCents,
+      shippingCents(input.month),
+    ),
     rows,
     rebates,
   };
@@ -126,9 +148,9 @@ export function buildCsv(report: SettlementReport, month: string): string {
       .join(","),
   );
   const lines = [
-    "范围,利润(分),返利收入(分),销售额(分),销量",
-    `历史累计,${report.allTime.profitCents},${report.allTime.rebateCents},${report.allTime.salesCents},${report.allTime.salesCount}`,
-    `${month},${report.selectedMonth.profitCents},${report.selectedMonth.rebateCents},${report.selectedMonth.salesCents},${report.selectedMonth.salesCount}`,
+    "范围,利润(分),返利收入(分),运费支出(分),销售额(分),销量",
+    `历史累计,${report.allTime.profitCents},${report.allTime.rebateCents},${report.allTime.shippingCents},${report.allTime.salesCents},${report.allTime.salesCount}`,
+    `${month},${report.selectedMonth.profitCents},${report.selectedMonth.rebateCents},${report.selectedMonth.shippingCents},${report.selectedMonth.salesCents},${report.selectedMonth.salesCount}`,
     "",
     detailHeader.join(","),
     ...details,

@@ -1,5 +1,10 @@
 const YUAN_PATTERN = /^(0|[1-9]\d*)(?:\.(\d{1,2}))?$/;
 
+/** Normalize decimal punctuation produced by Chinese iOS keyboards. */
+export function normalizeMoneyInput(text: string): string {
+  return text.replace(/[，,。]/g, ".");
+}
+
 /** Validate an integer amount represented in cents. */
 export function assertCents(value: number, fieldName = "金额"): void {
   if (!Number.isSafeInteger(value) || value < 0) {
@@ -9,7 +14,7 @@ export function assertCents(value: number, fieldName = "金额"): void {
 
 /** Parse a non-negative yuan string without floating-point multiplication. */
 export function parseYuanToCents(text: string): number {
-  const normalized = text.trim();
+  const normalized = normalizeMoneyInput(text.trim());
   const match = YUAN_PATTERN.exec(normalized);
   if (!match) throw new TypeError("金额格式不正确，最多保留两位小数");
   const yuan = Number(match[1]);

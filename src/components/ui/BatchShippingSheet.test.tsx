@@ -32,7 +32,7 @@ describe("BatchShippingSheet", () => {
     await userEvent.type(screen.getByLabelText("总快递费"), "10.00");
     expect(screen.getByText("分摊合计：¥10.00")).toBeInTheDocument();
     await userEvent.click(screen.getByText("确认寄出并均摊"));
-    expect(onConfirm).toHaveBeenCalledWith(1000, false);
+    expect(onConfirm).toHaveBeenCalledWith(1000, "append", "2026-08-14");
   });
 
   it("requires freight for a single shipment", async () => {
@@ -56,6 +56,6 @@ describe("BatchShippingSheet", () => {
     await userEvent.click(
       screen.getByRole("button", { name: "确认运费并寄出" }),
     );
-    expect(onConfirm).toHaveBeenCalledWith(850, false);
+    expect(onConfirm).toHaveBeenCalledWith(850, "append", "2026-08-14");
   });
 });

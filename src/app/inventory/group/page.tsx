@@ -10,7 +10,7 @@ import {
   PLATFORMS,
   type Platform,
 } from "@/lib/constants/platform";
-import { STATUS_META } from "@/lib/constants/status";
+import { STATUS_META, UNIT_STATUSES, type UnitStatus } from "@/lib/constants/status";
 import { getDb } from "@/lib/data";
 import type { DbAdapter } from "@/lib/data/types";
 import { deleteUnitDeep } from "@/lib/services/maintenance";
@@ -42,6 +42,10 @@ function SearchParamGroup({ dataSource }: { dataSource?: DbAdapter }) {
   const platform = PLATFORMS.some((item) => item.value === platformValue)
     ? (platformValue as Platform)
     : null;
+  const scopeValue = params.get("scope");
+  const scope = scopeValue === "active" || UNIT_STATUSES.includes(scopeValue as UnitStatus)
+    ? scopeValue as "active" | UnitStatus
+    : null;
   return (
     <GroupContent
       dataSource={dataSource}
@@ -50,6 +54,7 @@ function SearchParamGroup({ dataSource }: { dataSource?: DbAdapter }) {
         productId: params.get("product"),
         size: params.get("size") ?? "",
         platform,
+        scope,
       }}
     />
   );
@@ -73,7 +78,7 @@ function GroupContent({
     (): DbAdapter => dataSource ?? getDb(),
     [dataSource],
   );
-  const { platform, productId, size, styleCode } = selection;
+  const { platform, productId, scope, size, styleCode } = selection;
 
   useEffect(() => {
     let active = true;
@@ -108,6 +113,7 @@ function GroupContent({
               productId,
               size,
               styleCode,
+              scope,
             })
               ? [joined]
               : [];
@@ -125,7 +131,7 @@ function GroupContent({
     return () => {
       active = false;
     };
-  }, [platform, productId, refresh, resolveDb, size, styleCode]);
+  }, [platform, productId, refresh, resolveDb, scope, size, styleCode]);
 
   const totalCost = units.reduce(
     (sum, unit) => sum + unit.unit_cost_cents,

@@ -3,7 +3,7 @@ import {
   PLATFORMS,
   type Platform,
 } from "@/lib/constants/platform";
-import type { UnitStatus } from "@/lib/constants/status";
+import { ACTIVE_STATUSES, type UnitStatus } from "@/lib/constants/status";
 import type { UnitJoined } from "@/lib/types/database";
 
 export type PlatformFilter = Platform | "all";
@@ -25,6 +25,7 @@ export interface GroupSelection {
   productId: string | null;
   size: string;
   platform: Platform | null;
+  scope?: "active" | UnitStatus | null;
 }
 
 function normalizeSize(value: string): string {
@@ -97,12 +98,14 @@ export function buildGroups(units: UnitJoined[]): UnitGroup[] {
 export function groupQuery(
   group: UnitGroup,
   platform: PlatformFilter,
+  scope?: GroupSelection["scope"],
 ): string {
   const params = new URLSearchParams();
   if (group.styleCode) params.set("style", group.styleCode);
   else params.set("product", group.product.id);
   params.set("size", group.size);
   if (platform !== "all") params.set("platform", platform);
+  if (scope) params.set("scope", scope);
   return params.toString();
 }
 
@@ -110,6 +113,16 @@ export function matchesGroup(
   unit: UnitJoined,
   selection: GroupSelection,
 ): boolean {
+  if (selection.scope === "active" && !ACTIVE_STATUSES.includes(unit.status)) {
+    return false;
+  }
+  if (
+    selection.scope &&
+    selection.scope !== "active" &&
+    unit.status !== selection.scope
+  ) {
+    return false;
+  }
   if (normalizeSize(unit.size) !== normalizeSize(selection.size)) return false;
   if (
     selection.platform &&

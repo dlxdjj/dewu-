@@ -132,6 +132,8 @@ function reportInput(month = "2026-08"): ReportInput {
       rebate("r1", "taobao_alliance", "2026-08", 1000),
       rebate("r2", "jingfen", "2026-07", 2000),
     ],
+    shippingEvents: [],
+    shippingEventItems: [],
     month,
   };
 }
@@ -145,14 +147,40 @@ describe("settlement reports", () => {
       rebateCents: 3000,
       salesCents: 24000,
       salesCount: 2,
+      shippingCents: 0,
     });
     expect(report.selectedMonth).toEqual({
       profitCents: 4500,
       rebateCents: 1000,
       salesCents: 12000,
       salesCount: 1,
+      shippingCents: 0,
     });
     expect(report.rows).toHaveLength(1);
+  });
+
+  it("sums only active shipping allocations by shipping month", () => {
+    const input = reportInput();
+    input.shippingEvents = [
+      {
+        id: "e1", user_id: "u1", shipped_at: "2026-08-02",
+        total_shipping_cents: 900, mode: "append", estimated: false,
+        note: null, created_at: timestamp, updated_at: timestamp,
+      },
+      {
+        id: "e2", user_id: "u1", shipped_at: "2026-07-02",
+        total_shipping_cents: 500, mode: "replace", estimated: false,
+        note: null, created_at: timestamp, updated_at: timestamp,
+      },
+    ];
+    input.shippingEventItems = [
+      { id: "i1", user_id: "u1", event_id: "e1", unit_id: "u1", allocated_shipping_cents: 900, active: true, voided_at: null, created_at: timestamp },
+      { id: "i2", user_id: "u1", event_id: "e2", unit_id: "u1", allocated_shipping_cents: 500, active: false, voided_at: timestamp, created_at: timestamp },
+    ];
+
+    const report = buildSettlementReport(input);
+    expect(report.selectedMonth.shippingCents).toBe(900);
+    expect(report.allTime.shippingCents).toBe(900);
   });
 
   it("excludes refunded and missing-payout rows", () => {
@@ -167,6 +195,7 @@ describe("settlement reports", () => {
       rebateCents: 3000,
       salesCents: 0,
       salesCount: 0,
+      shippingCents: 0,
     });
   });
 
@@ -174,9 +203,9 @@ describe("settlement reports", () => {
     const report = buildSettlementReport(reportInput());
     const csv = buildCsv(report, "2026-08");
 
-    expect(csv).toContain("范围,利润(分),返利收入(分),销售额(分),销量");
-    expect(csv).toContain("历史累计,11500,3000,24000,2");
-    expect(csv).toContain("2026-08,4500,1000,12000,1");
+    expect(csv).toContain("范围,利润(分),返利收入(分),运费支出(分),销售额(分),销量");
+    expect(csv).toContain("历史累计,11500,3000,0,24000,2");
+    expect(csv).toContain("2026-08,4500,1000,0,12000,1");
     expect(csv).toContain("测试鞋,42,8000,500,12000,3500,2026-08-03");
     expect(csv).toContain("淘宝联盟,2026-08,1000");
   });

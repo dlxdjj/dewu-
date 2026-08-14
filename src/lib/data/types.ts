@@ -1,9 +1,14 @@
 import type { Platform } from "@/lib/constants/platform";
 import type { UnitStatus } from "@/lib/constants/status";
-import type { Attachment, AttachmentKind, AttachmentOwner, InventoryUnit, MonthlyRebate, Product, PurchaseBatch, Sale, StatusHistory } from "@/lib/types/database";
+import type { Attachment, AttachmentKind, AttachmentOwner, InventoryUnit, MonthlyRebate, Product, PurchaseBatch, Sale, ShippingEvent, ShippingEventItem, StatusHistory } from "@/lib/types/database";
 
 export interface ShippingAllocation { unitId: string; shippingCents: number; }
-export interface ShipUnitsInput { unitIds: string[]; totalShippingCents: number; overwriteConfirmed: boolean; }
+export interface ShipUnitsInput {
+  unitIds: string[];
+  totalShippingCents: number;
+  mode: "append" | "replace";
+  shippedAt: string;
+}
 export interface ShipUnitsResult { allocations: ShippingAllocation[]; totalShippingCents: number; overwrittenUnitIds: string[]; }
 export interface SettleUnitsInput { unitIds: string[]; actualPayoutCents: number; settledAt: string; }
 export interface StatusChangeInput { unitIds: string[]; toStatus: UnitStatus; note?: string; }
@@ -25,6 +30,8 @@ export interface DbAdapter {
   listProducts(): Promise<Product[]>; listBatches(): Promise<PurchaseBatch[]>; listUnits(): Promise<InventoryUnit[]>;
   listSales(): Promise<Sale[]>; listHistory(unitId?: string): Promise<StatusHistory[]>;
   listRebates(): Promise<MonthlyRebate[]>;
+  listShippingEvents(): Promise<ShippingEvent[]>;
+  listShippingEventItems(): Promise<ShippingEventItem[]>;
   listAttachments(ownerType: AttachmentOwner, ownerId?: string): Promise<Attachment[]>;
   attachmentUrl(attachment: Attachment): Promise<string>; saveAttachment(input: SaveAttachmentInput): Promise<Attachment>;
   createPurchase(input: PurchaseInput): Promise<PurchaseResult>;

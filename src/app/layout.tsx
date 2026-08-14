@@ -2,6 +2,8 @@ import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import BottomNav from "@/components/layout/BottomNav";
 import DataSourceGate from "@/components/ui/DataSourceGate";
+import PwaBootstrap from "@/components/PwaBootstrap";
+import AppDataProvider from "@/components/AppDataProvider";
 
 export const metadata: Metadata = {
   title: "进销存",
@@ -31,8 +33,11 @@ export default function RootLayout({
       <body className="min-h-dvh">
         {/* 内容区：移动端单列，底部预留导航高度 */}
         <DataSourceGate>
-          <main className="mx-auto w-full max-w-3xl px-4 pb-32 pt-[calc(1.5rem+env(safe-area-inset-top))]">{children}</main>
-          <BottomNav />
+          <PwaBootstrap />
+          <AppDataProvider>
+            <main className="mx-auto w-full max-w-3xl px-4 pb-32 pt-[calc(1.5rem+env(safe-area-inset-top))]">{children}</main>
+            <BottomNav />
+          </AppDataProvider>
         </DataSourceGate>
       </body>
     </html>

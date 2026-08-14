@@ -399,7 +399,7 @@ test("390px inventory supports quick batch settlement and shipping with freight"
       return route.fulfill({ status: 204 });
     }
 
-    if (table === "ship_units") {
+    if (table === "record_shipment") {
       const body = route.request().postDataJSON() as {
         p_unit_ids: string[];
         p_total_shipping_cents: number;
@@ -426,6 +426,7 @@ test("390px inventory supports quick batch settlement and shipping with freight"
   });
 
   await page.goto("/inventory/");
+  await page.getByRole("button", { name: "待结算 2" }).click();
   await expect(
     page.getByRole("button", { name: "录到手价 · 2 件待结算" }),
   ).toBeVisible();
@@ -443,8 +444,11 @@ test("390px inventory supports quick batch settlement and shipping with freight"
     page.getByRole("button", { name: "录到手价 · 2 件待结算" }),
   ).not.toBeVisible();
 
+  await page.getByRole("button", { name: "当前库存 1" }).click();
+  await page.getByRole("button", { name: "筛选" }).click();
   await page.getByRole("button", { name: "已到货" }).click();
-  await expect(page.getByText("1 件 · 1 组")).toBeVisible();
+  await page.getByRole("button", { name: "查看结果" }).click();
+  await expect(page.getByText("1 件 · 1 款")).toBeVisible();
   await page.getByRole("button", { name: "批量操作" }).click();
   await page
     .getByRole("button", { name: "选择 E2E-1 42，共 1 件" })
@@ -458,7 +462,7 @@ test("390px inventory supports quick batch settlement and shipping with freight"
   await freight.fill("9");
   await expect(page.getByText("本件运费：¥9.00")).toBeVisible();
   await page.getByRole("button", { name: "确认运费并寄出" }).click();
-  await expect(page.getByText("0 件 · 0 组")).toBeVisible();
+  await expect(page.getByText("0 件 · 0 款")).toBeVisible();
 
   expect(units.find((unit) => unit.id === "arrived-1")).toMatchObject({
     status: "shipping",

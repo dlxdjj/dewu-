@@ -16,6 +16,7 @@ import { getDb } from "@/lib/data";
 import type { DbAdapter } from "@/lib/data/types";
 import { createPurchase } from "@/lib/services/purchase";
 import { todayStr } from "@/lib/utils/format";
+import { normalizeMoneyInput } from "@/lib/utils/money";
 
 const inputClass =
   "w-full min-w-0 max-w-full box-border rounded-xl bg-background px-3 py-3 text-base";
@@ -229,7 +230,9 @@ export default function PurchaseForm({
                 inputMode="decimal"
                 className={`${inputClass} mt-1`}
                 value={form.unitPrice}
-                onChange={(event) => set("unitPrice", event.target.value)}
+                onChange={(event) =>
+                  set("unitPrice", normalizeMoneyInput(event.target.value))
+                }
                 placeholder="0.00"
               />
             </label>

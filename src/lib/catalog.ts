@@ -1,6 +1,8 @@
 import type { DbAdapter } from "@/lib/data/types";
 import type { Attachment, Product } from "@/lib/types/database";
 
+const signedUrlCache = new Map<string, { url: string; expiresAt: number }>();
+
 export function normalizeStyleCode(value: string | null | undefined): string {
   return (value ?? "").trim().toLocaleLowerCase();
 }
@@ -51,7 +53,16 @@ export async function loadProductImageUrls(
       const attachment = latest.get(productId);
       if (!attachment) return null;
       try {
-        return [productId, await db.attachmentUrl(attachment)] as const;
+        const cached = signedUrlCache.get(attachment.path);
+        if (cached && cached.expiresAt > Date.now()) {
+          return [productId, cached.url] as const;
+        }
+        const url = await db.attachmentUrl(attachment);
+        signedUrlCache.set(attachment.path, {
+          url,
+          expiresAt: Date.now() + 12 * 60_000,
+        });
+        return [productId, url] as const;
       } catch {
         return null;
       }

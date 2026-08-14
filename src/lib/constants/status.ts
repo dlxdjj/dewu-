@@ -38,8 +38,8 @@ export const STATUS_META: Record<UnitStatus, { label: string; color: string }> =
   in_stock_dewu: { label: "得物仓未售", color: "#7B2CBF" },
   sold: { label: "已售待结算", color: "#9A5700" },
   settled: { label: "已结算", color: "#1B7F37" },
-  returned: { label: "退回", color: "#D70015" },
-  refunded: { label: "退款", color: "#636366" },
+  returned: { label: "退回待处理", color: "#D70015" },
+  refunded: { label: "退货退款", color: "#636366" },
 };
 
 /** 状态直达：除自身外任意状态可互转 */

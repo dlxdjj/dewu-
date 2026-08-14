@@ -8,6 +8,7 @@ import type { UnitJoined } from "@/lib/types/database";
 import { todayStr } from "@/lib/utils/format";
 import {
   formatCents,
+  normalizeMoneyInput,
   parseYuanToCents,
 } from "@/lib/utils/money";
 import Sheet from "./Sheet";
@@ -88,7 +89,9 @@ export default function SaleFormSheet({
             required
             inputMode="decimal"
             value={payout}
-            onChange={(event) => setPayout(event.target.value)}
+            onChange={(event) =>
+              setPayout(normalizeMoneyInput(event.target.value))
+            }
             className="mt-1 w-full min-w-0 rounded-xl bg-background px-3 py-3 text-base"
             placeholder="0.00"
           />

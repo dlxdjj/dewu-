@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState, type FormEvent } from "react";
 import Card from "@/components/ui/Card";
 import PageHeader from "@/components/ui/PageHeader";
 import Stat from "@/components/ui/Stat";
+import { useAppData } from "@/components/AppDataProvider";
 import { REBATE_SOURCE_LABELS, type RebateSource } from "@/lib/constants/rebate";
 import { getDb } from "@/lib/data";
 import type { DbAdapter } from "@/lib/data/types";
@@ -19,9 +20,11 @@ import type {
   Product,
   PurchaseBatch,
   Sale,
+  ShippingEvent,
+  ShippingEventItem,
 } from "@/lib/types/database";
 import { monthKey } from "@/lib/utils/format";
-import { formatCents } from "@/lib/utils/money";
+import { formatCents, normalizeMoneyInput } from "@/lib/utils/money";
 
 interface ReportSource {
   units: InventoryUnit[];
@@ -29,6 +32,8 @@ interface ReportSource {
   batches: PurchaseBatch[];
   sales: Sale[];
   rebates: MonthlyRebate[];
+  shippingEvents: ShippingEvent[];
+  shippingEventItems: ShippingEventItem[];
 }
 
 export default function ReportsPage({
@@ -43,9 +48,13 @@ export default function ReportsPage({
   );
   const [raw, setRaw] = useState<ReportSource | null>(null);
   const [error, setError] = useState("");
+  const shared = useAppData();
 
   useEffect(() => {
     let active = true;
+    if (!dataSource && shared) {
+      return () => { active = false; };
+    }
     const db = dataSource ?? getDb();
     Promise.all([
       db.listUnits(),
@@ -53,9 +62,11 @@ export default function ReportsPage({
       db.listBatches(),
       db.listSales(),
       db.listRebates(),
+      db.listShippingEvents(),
+      db.listShippingEventItems(),
     ])
-      .then(([units, products, batches, sales, rebates]) => {
-        if (active) setRaw({ units, products, batches, sales, rebates });
+      .then(([units, products, batches, sales, rebates, shippingEvents, shippingEventItems]) => {
+        if (active) setRaw({ units, products, batches, sales, rebates, shippingEvents, shippingEventItems });
       })
       .catch((reason: unknown) => {
         if (active) {
@@ -65,21 +76,24 @@ export default function ReportsPage({
     return () => {
       active = false;
     };
-  }, [dataSource]);
+  }, [dataSource, shared]);
+
+  const source = !dataSource && shared ? shared.data : raw;
+  const displayError = !dataSource && shared ? shared.error : error;
 
   const report = useMemo(
-    () => (raw ? buildSettlementReport({ ...raw, month }) : null),
-    [raw, month],
+    () => (source ? buildSettlementReport({ ...source, month }) : null),
+    [source, month],
   );
   const monthText = `${Number(month.slice(5))}月`;
 
   return (
     <>
       <PageHeader title="报表" subtitle="已结算实际到账 + 返利收入" />
-      {error ? (
+      {displayError ? (
         <Card>
           <p role="alert" className="text-sm text-danger">
-            {error}
+            {displayError}
           </p>
         </Card>
       ) : (
@@ -102,11 +116,11 @@ export default function ReportsPage({
               />
             </span>
           </label>
-          {raw && (
+          {source && (
             <RebateEditor
               key={month}
               month={month}
-              rebates={raw.rebates}
+              rebates={source.rebates}
               dataSource={dataSource ?? getDb()}
               onSaved={(saved) => {
                 setRaw((current) =>
@@ -226,7 +240,9 @@ function RebateEditor({
               required
               inputMode="decimal"
               value={taobaoAlliance}
-              onChange={(event) => setTaobaoAlliance(event.target.value)}
+              onChange={(event) =>
+                setTaobaoAlliance(normalizeMoneyInput(event.target.value))
+              }
               className="mt-1 w-full min-w-0 rounded-xl bg-background px-3 py-3 text-base"
             />
           </label>
@@ -237,7 +253,9 @@ function RebateEditor({
               required
               inputMode="decimal"
               value={jingfen}
-              onChange={(event) => setJingfen(event.target.value)}
+              onChange={(event) =>
+                setJingfen(normalizeMoneyInput(event.target.value))
+              }
               className="mt-1 w-full min-w-0 rounded-xl bg-background px-3 py-3 text-base"
             />
           </label>
@@ -278,13 +296,19 @@ function SummarySection({
   return (
     <section aria-label={ariaLabel} className="mt-3">
       <h2 className="mb-2 text-sm font-medium text-muted">{title}</h2>
-      <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(4.25rem,0.62fr)] gap-2">
+      <div className="grid grid-cols-2 gap-2 md:grid-cols-4">
         <Stat
           label={lifetime ? "总利润" : "利润"}
           value={summary ? formatCents(summary.profitCents) : "…"}
           hint={
             summary ? `含返利 ${formatCents(summary.rebateCents)}` : undefined
           }
+          compact
+        />
+        <Stat
+          label={lifetime ? "总运费" : "运费"}
+          value={summary ? formatCents(summary.shippingCents) : "…"}
+          hint="按寄出日期"
           compact
         />
         <Stat

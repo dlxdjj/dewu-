@@ -81,7 +81,8 @@ describe("status and sale integrity", () => {
     await db.shipUnits({
       unitIds: purchase.unitIds,
       totalShippingCents: 800,
-      overwriteConfirmed: false,
+      mode: "append",
+      shippedAt: "2026-08-10",
     });
 
     const state = db.snapshot();

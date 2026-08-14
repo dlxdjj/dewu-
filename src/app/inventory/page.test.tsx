@@ -12,8 +12,9 @@ describe("InventoryPage", () => {
     );
 
     expect(await screen.findByText("×3")).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "筛选" }));
     expect(
-      screen.getByRole("button", { name: "全部平台" }),
+      screen.getByRole("button", { name: "全部" }),
     ).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "淘宝" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "拼多多" })).toBeInTheDocument();
@@ -32,13 +33,26 @@ describe("InventoryPage", () => {
     );
     await screen.findByText("×3");
 
+    await userEvent.click(screen.getByRole("button", { name: "筛选" }));
     await userEvent.click(
       screen.getByRole("button", { name: "发往得物途中" }),
     );
+    await userEvent.click(screen.getByRole("button", { name: "查看结果" }));
 
     expect(await screen.findByText("×1")).toBeInTheDocument();
-    expect(screen.getByText("1 件 · 1 组")).toBeInTheDocument();
-    expect(screen.getAllByText("发往得物途中 1")).toHaveLength(2);
+    expect(screen.getByText("1 件 · 1 款")).toBeInTheDocument();
+    expect(screen.getByText("发往得物途中 1")).toBeInTheDocument();
+  });
+
+  it("searches by product, style, size, order or platform", async () => {
+    render(
+      <InventoryPage dataSource={new MemoryDbAdapter(makeInventorySeed())} />,
+    );
+    await screen.findByText("×3");
+
+    await userEvent.type(screen.getByRole("searchbox", { name: "搜索库存" }), "拼多多");
+    expect(await screen.findByText("×1")).toBeInTheDocument();
+    expect(screen.getByText("1 件 · 1 款")).toBeInTheDocument();
   });
 
   it("selects every underlying unit when a merged group is selected", async () => {
@@ -115,6 +129,9 @@ describe("InventoryPage", () => {
     render(<InventoryPage dataSource={db} />);
 
     await userEvent.click(
+      await screen.findByRole("button", { name: "待结算 2" }),
+    );
+    await userEvent.click(
       await screen.findByRole("button", {
         name: "录到手价 · 2 件待结算",
       }),
@@ -135,34 +152,27 @@ describe("InventoryPage", () => {
     ]);
   });
 
-  it("keeps inventory visible and explains when a refunded unit blocks a batch action", async () => {
+  it("keeps refunded goods out of current inventory and in refund history", async () => {
     const seed = makeInventorySeed();
     seed.units![0].status = "refunded";
     const db = new MemoryDbAdapter(seed);
     render(<InventoryPage dataSource={db} />);
-    await screen.findByText("×3");
-    await userEvent.click(screen.getByRole("button", { name: "批量操作" }));
-    await userEvent.click(
-      screen.getByRole("button", { name: "选择 AB-1 42，共 3 件" }),
-    );
-    await userEvent.click(screen.getByRole("button", { name: "批量寄出" }));
-
-    expect(screen.getByRole("alert")).toHaveTextContent(
-      "选择中包含退款件，请先按状态筛选后再寄出。",
-    );
-    expect(screen.getByText("×3")).toBeInTheDocument();
-    expect(screen.queryByLabelText("总快递费")).not.toBeInTheDocument();
+    expect(await screen.findByText("×2")).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "退货退款 1" }));
+    expect(await screen.findByText("×1")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "批量操作" })).not.toBeInTheDocument();
   });
 
   it("warns before a batch status action deletes financial records", async () => {
     const seed = makeInventorySeed();
-    seed.units![0].status = "settled";
+    seed.units![0].status = "sold";
     const confirm = vi.spyOn(window, "confirm").mockReturnValue(false);
     render(<InventoryPage dataSource={new MemoryDbAdapter(seed)} />);
-    await screen.findByText("×3");
+    await userEvent.click(await screen.findByRole("button", { name: "待结算 1" }));
+    await screen.findByText("×1");
     await userEvent.click(screen.getByRole("button", { name: "批量操作" }));
     await userEvent.click(
-      screen.getByRole("button", { name: "选择 AB-1 42，共 3 件" }),
+      screen.getByRole("button", { name: "选择 AB-1 42，共 1 件" }),
     );
     await userEvent.click(screen.getByRole("button", { name: "批量寄出" }));
 

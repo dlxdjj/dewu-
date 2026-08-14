@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import type { AuthChangeEvent, Session } from "@supabase/supabase-js";
 import {
@@ -74,6 +74,12 @@ export function DataSourceGateController({
 }) {
   const pathname = navigation.pathname;
   const replace = navigation.replace;
+  const pathnameRef = useRef(pathname);
+  const replaceRef = useRef(replace);
+  useEffect(() => {
+    pathnameRef.current = pathname;
+    replaceRef.current = replace;
+  }, [pathname, replace]);
   const [state, setState] = useState<GateState>("loading");
   const [message, setMessage] = useState("");
   const [attempt, setAttempt] = useState(0);
@@ -113,20 +119,20 @@ export function DataSourceGateController({
 
         if (session) {
           setState("authenticated");
-          if (pathname === "/login") replace("/");
+          if (pathnameRef.current === "/login") replaceRef.current("/");
         } else {
           setState("unauthenticated");
-          if (pathname !== "/login") replace("/login");
+          if (pathnameRef.current !== "/login") replaceRef.current("/login");
         }
 
         unsubscribe = dependencies.onAuthSessionChange((_event, changedSession) => {
           if (!active) return;
           if (changedSession) {
             setState("authenticated");
-            if (pathname === "/login") replace("/");
+            if (pathnameRef.current === "/login") replaceRef.current("/");
           } else {
             setState("unauthenticated");
-            if (pathname !== "/login") replace("/login");
+            if (pathnameRef.current !== "/login") replaceRef.current("/login");
           }
         });
       } catch (error: unknown) {
@@ -145,7 +151,7 @@ export function DataSourceGateController({
       active = false;
       unsubscribe();
     };
-  }, [attempt, dependencies, pathname, replace]);
+  }, [attempt, dependencies]);
 
   if (state === "loading") {
     return <GateCard title="正在连接 Supabase" detail="正在确认登录状态…" />;

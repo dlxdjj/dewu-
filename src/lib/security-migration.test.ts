@@ -14,7 +14,11 @@ const rebateMigrationPath = path.resolve(
   __dirname,
   "../../supabase/migrations/0005_monthly_rebates.sql",
 );
-const migration = [secureMigrationPath, integrityMigrationPath, rebateMigrationPath]
+const shippingMigrationPath = path.resolve(
+  __dirname,
+  "../../supabase/migrations/0006_shipping_events.sql",
+);
+const migration = [secureMigrationPath, integrityMigrationPath, rebateMigrationPath, shippingMigrationPath]
   .map((migrationPath) => fs.readFileSync(migrationPath, "utf8"))
   .join("\n");
 
@@ -46,8 +50,16 @@ describe("secure migration RPC contracts", () => {
   });
 
   it("removes old sales when units leave a sale state through shipping", () => {
-    const body = functionBody("ship_units");
+    const body = functionBody("record_shipment");
     expect(body).toMatch(/delete from sales[^]*unit_id\s*=\s*v_row\.id/i);
+  });
+
+  it("records owned dated shipping allocations atomically", () => {
+    const body = functionBody("record_shipment");
+    expect(body).toMatch(/v_uid uuid := require_uid\(\)/i);
+    expect(body).toMatch(/insert into shipping_events/i);
+    expect(body).toMatch(/insert into shipping_event_items/i);
+    expect(body).toMatch(/p_mode not in \('append','replace'\)/i);
   });
 
   it("creates an unsettled sale row when status changes to sold", () => {
@@ -75,5 +87,6 @@ describe("secure migration RPC contracts", () => {
     const body = functionBody("clear_all_data");
     expect(body).toMatch(/delete from monthly_rebates where user_id = v_uid/i);
     expect(body).toMatch(/'rebates',c_rebates/i);
+    expect(body).toMatch(/delete from shipping_events where user_id = v_uid/i);
   });
 });
