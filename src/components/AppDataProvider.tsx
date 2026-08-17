@@ -1,10 +1,11 @@
 "use client";
 
-import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
 import { getDb } from "@/lib/data";
 import { supportsRebateIncome } from "@/lib/account-features";
 import { toAppPathname } from "@/lib/base-path";
+import { onAuthSessionChange } from "@/lib/supabase/auth";
 import type {
   AccountPreferences,
   InventoryUnit,
@@ -42,8 +43,11 @@ export default function AppDataProvider({ children }: { children: React.ReactNod
   const [data, setData] = useState<AppDataSnapshot | null>(null);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
+  const activeUserId = useRef<string | null>(null);
+  const loadVersion = useRef(0);
 
   const refresh = useCallback(async () => {
+    const version = ++loadVersion.current;
     setError("");
     setLoading(true);
     try {
@@ -65,11 +69,14 @@ export default function AppDataProvider({ children }: { children: React.ReactNod
         shippingEventsPromise,
         shippingEventItemsPromise,
       ]);
+      if (version !== loadVersion.current) return;
+      activeUserId.current = preferences.user_id || null;
       setData({ preferences, units, products, batches, sales, rebates, shippingEvents, shippingEventItems });
     } catch (reason) {
+      if (version !== loadVersion.current) return;
       setError(reason instanceof Error ? reason.message : "加载失败");
     } finally {
-      setLoading(false);
+      if (version === loadVersion.current) setLoading(false);
     }
   }, []);
 
@@ -83,6 +90,17 @@ export default function AppDataProvider({ children }: { children: React.ReactNod
     window.addEventListener("pms:data-mutated", reload);
     return () => window.removeEventListener("pms:data-mutated", reload);
   }, [refresh]);
+
+  useEffect(() => onAuthSessionChange((_event, session) => {
+    const nextUserId = session?.user.id ?? null;
+    if (nextUserId === activeUserId.current) return;
+    loadVersion.current += 1;
+    activeUserId.current = nextUserId;
+    setData(null);
+    setError("");
+    setLoading(Boolean(nextUserId && shouldLoad));
+    if (nextUserId && shouldLoad) void refresh();
+  }), [refresh, shouldLoad]);
 
   const value = useMemo(() => ({ data, error, loading, refresh }), [data, error, loading, refresh]);
   return <AppDataContext.Provider value={value}>{children}</AppDataContext.Provider>;

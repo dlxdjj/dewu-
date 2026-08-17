@@ -9,7 +9,7 @@ vi.mock("@/lib/supabase/client", () => ({
 }));
 
 import { createSupabaseAdapter } from "./cloud";
-import type { Attachment, MonthlyRebate } from "@/lib/types/database";
+import type { Attachment, MonthlyRebate, Product } from "@/lib/types/database";
 
 function createClient(lookupRows: Attachment[]) {
   const upload = vi.fn().mockResolvedValue({ data: { path: "uploaded" }, error: null });
@@ -200,5 +200,54 @@ describe("Supabase monthly rebates", () => {
     getSupabaseMock.mockReturnValue(client);
 
     await expect(createSupabaseAdapter().listRebates()).resolves.toEqual([]);
+  });
+});
+
+describe("Supabase account cache isolation", () => {
+  beforeEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it("uses the current user namespace after switching accounts", async () => {
+    const suffix = crypto.randomUUID();
+    let currentUserId = `owner-${suffix}`;
+    const productForCurrentUser = (): Product => ({
+      id: `product-${currentUserId}`,
+      user_id: currentUserId,
+      name: currentUserId.startsWith("owner-") ? "我的商品" : "朋友的商品",
+      style_code: "SWITCH-001",
+      brand: null,
+      created_at: "2026-08-17T00:00:00Z",
+      updated_at: "2026-08-17T00:00:00Z",
+    });
+    const query = {
+      select: vi.fn(),
+      order: vi.fn(() => Promise.resolve({
+        data: [productForCurrentUser()],
+        error: null,
+      })),
+    };
+    query.select.mockReturnValue(query);
+    const client = {
+      auth: {
+        getSession: vi.fn(() => Promise.resolve({
+          data: { session: { user: { id: currentUserId } } },
+          error: null,
+        })),
+      },
+      from: vi.fn().mockReturnValue(query),
+    };
+    getSupabaseMock.mockReturnValue(client);
+    const adapter = createSupabaseAdapter();
+
+    await expect(adapter.listProducts()).resolves.toEqual([
+      expect.objectContaining({ user_id: `owner-${suffix}`, name: "我的商品" }),
+    ]);
+
+    currentUserId = `friend-${suffix}`;
+    await expect(adapter.listProducts()).resolves.toEqual([
+      expect.objectContaining({ user_id: `friend-${suffix}`, name: "朋友的商品" }),
+    ]);
+    expect(client.auth.getSession).toHaveBeenCalledTimes(2);
   });
 });

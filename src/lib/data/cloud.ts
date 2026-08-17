@@ -53,14 +53,12 @@ async function requestVoid(
 /** Create the authenticated Supabase data adapter. */
 export function createSupabaseAdapter(): DbAdapter {
   const client = getSupabase();
-  let namespacePromise: Promise<string> | null = null;
   const cacheNamespace = () => {
     if (!client.auth?.getSession) return Promise.resolve("adapter-default");
-    namespacePromise ??= withDataTimeout(client.auth.getSession()).then(({ data, error }) => {
+    return withDataTimeout(client.auth.getSession()).then(({ data, error }) => {
       if (error) throw new DataAccessError(error.message, false);
       return data.session?.user.id ?? "signed-out";
     });
-    return namespacePromise;
   };
   const cached = async <T>(key: string, loader: () => Promise<T>): Promise<T> =>
     cachedRead(await cacheNamespace(), key, loader);

@@ -1,4 +1,5 @@
 const DB_NAME = "dewu-pms-cache";
+const DB_VERSION = 2;
 const STORE_NAME = "snapshots";
 const MEMORY_TTL_MS = 60_000;
 const DISK_TTL_MS = 5 * 60_000;
@@ -14,10 +15,14 @@ const inflight = new Map<string, Promise<unknown>>();
 function openCache(): Promise<IDBDatabase | null> {
   if (typeof indexedDB === "undefined") return Promise.resolve(null);
   return new Promise((resolve) => {
-    const request = indexedDB.open(DB_NAME, 1);
+    const request = indexedDB.open(DB_NAME, DB_VERSION);
     request.onupgradeneeded = () => {
       if (!request.result.objectStoreNames.contains(STORE_NAME)) {
         request.result.createObjectStore(STORE_NAME);
+      } else {
+        // Version 1 could reuse the first signed-in user's namespace after an
+        // account switch. Discard those potentially cross-account snapshots.
+        request.transaction?.objectStore(STORE_NAME).clear();
       }
     };
     request.onsuccess = () => resolve(request.result);
