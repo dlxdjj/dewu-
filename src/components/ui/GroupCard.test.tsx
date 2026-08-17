@@ -80,7 +80,7 @@ describe("GroupCard", () => {
       makeJoinedUnit({ id: "s1", status: "sold" }),
       makeJoinedUnit({ id: "s2", status: "sold" }),
     ])[0];
-    const onSettle = vi.fn();
+    const onProcess = vi.fn();
     render(
       <GroupCard
         group={soldGroup}
@@ -89,13 +89,13 @@ describe("GroupCard", () => {
         selectable={false}
         selected={false}
         onToggle={vi.fn()}
-        onSettle={onSettle}
+        onProcess={onProcess}
       />,
     );
 
     await userEvent.click(
-      screen.getByRole("button", { name: "录到手价 · 2 件待结算" }),
+      screen.getByRole("button", { name: "录入到手价 · 2 件" }),
     );
-    expect(onSettle).toHaveBeenCalledWith(soldGroup.units);
+    expect(onProcess).toHaveBeenCalledWith(soldGroup.units);
   });
 });

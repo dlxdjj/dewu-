@@ -31,8 +31,7 @@ describe("SaleFormSheet", () => {
 
     expect(screen.getByText("每件实际到手价（元，必填）")).toBeInTheDocument();
     await userEvent.type(screen.getByLabelText("实际到手价"), "123.45");
-    expect(screen.getByText("2 件 × ¥123.45")).toBeInTheDocument();
-    expect(screen.getByText("实际到账合计 ¥246.90")).toBeInTheDocument();
+    expect(screen.getByText("2 件到账合计 ¥246.90")).toBeInTheDocument();
     await userEvent.click(
       screen.getByRole("button", { name: "确认到手价并结算" }),
     );
@@ -42,6 +41,57 @@ describe("SaleFormSheet", () => {
       12345,
       12345,
     ]);
+  });
+
+  it("supports a different payout for each unit in one batch", async () => {
+    const db = new MemoryDbAdapter({
+      products: [makeJoinedUnit().product],
+      batches: [makeJoinedUnit({ id: "u1" }).batch, makeJoinedUnit({ id: "u2" }).batch],
+      units: [
+        stripJoined(makeJoinedUnit({ id: "u1", status: "sold" })),
+        stripJoined(makeJoinedUnit({ id: "u2", status: "sold" })),
+      ],
+    });
+    render(
+      <SaleFormSheet
+        units={await joinedUnits(db)}
+        dataSource={db}
+        onClose={() => undefined}
+        onDone={() => undefined}
+      />,
+    );
+
+    await userEvent.click(screen.getByRole("button", { name: "分别填写" }));
+    await userEvent.type(screen.getByLabelText("第 1 件实际到手价"), "120.50");
+    await userEvent.type(screen.getByLabelText("第 2 件实际到手价"), "135.25");
+    expect(screen.getByText("2 件到账合计 ¥255.75")).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "确认到手价并结算" }));
+
+    await waitFor(() => expect(db.snapshot().units.every((unit) => unit.status === "settled")).toBe(true));
+    expect(db.snapshot().sales.map((sale) => sale.actual_payout_cents).sort()).toEqual([12050, 13525]);
+  });
+
+  it("can mark an in-stock unit as sold without knowing the payout yet", async () => {
+    const joined = makeJoinedUnit({ id: "u1", status: "in_stock_dewu" });
+    const db = new MemoryDbAdapter({
+      products: [joined.product],
+      batches: [joined.batch],
+      units: [stripJoined(joined)],
+    });
+    render(
+      <SaleFormSheet
+        units={await joinedUnits(db)}
+        dataSource={db}
+        allowPending
+        onClose={() => undefined}
+        onDone={() => undefined}
+      />,
+    );
+
+    expect(screen.getByRole("heading", { name: "登记售出" })).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "标记已售，稍后结算" }));
+    await waitFor(() => expect(db.snapshot().units[0].status).toBe("sold"));
+    expect(db.snapshot().sales[0].actual_payout_cents).toBeNull();
   });
 
   it("prefills and updates an existing single settlement", async () => {

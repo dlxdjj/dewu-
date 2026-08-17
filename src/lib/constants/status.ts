@@ -1,4 +1,4 @@
-// 单件库存状态：8 个状态，任意状态可直接互转（状态直达，无流程约束）
+// 单件库存状态。普通界面按“下一步操作”推进，状态全集只用于筛选和纠错。
 
 export const UNIT_STATUSES = [
   "pending", // 未到货
@@ -21,16 +21,6 @@ export const PURCHASE_INITIAL_STATUSES = [
   "returned",
 ] as const satisfies readonly UnitStatus[];
 
-/** 批量普通状态变更；寄出、结算和退款必须走专用表单/RPC。 */
-export const BATCH_STATUS_TARGETS = [
-  "pending",
-  "arrived",
-  "shipping",
-  "in_stock_dewu",
-  "sold",
-  "returned",
-] as const satisfies readonly UnitStatus[];
-
 export const STATUS_META: Record<UnitStatus, { label: string; color: string }> = {
   pending: { label: "未到货", color: "#9A5700" },
   arrived: { label: "已到货", color: "#0067C0" },
@@ -42,10 +32,42 @@ export const STATUS_META: Record<UnitStatus, { label: string; color: string }> =
   refunded: { label: "退货退款", color: "#636366" },
 };
 
-/** 状态直达：除自身外任意状态可互转 */
+/** 用户正常业务流程允许的状态方向；寄出、结算和退款仍必须走专用表单。 */
+export const STATUS_TRANSITIONS: Record<UnitStatus, readonly UnitStatus[]> = {
+  pending: ["arrived", "refunded"],
+  arrived: ["shipping", "refunded"],
+  shipping: ["in_stock_dewu", "returned", "refunded"],
+  in_stock_dewu: ["sold", "returned", "refunded"],
+  sold: ["settled", "returned"],
+  settled: ["returned"],
+  returned: ["shipping", "refunded"],
+  refunded: [],
+};
+
 export function canTransition(from: UnitStatus, to: UnitStatus): boolean {
-  return from !== to && UNIT_STATUSES.includes(to);
+  return STATUS_TRANSITIONS[from].includes(to);
 }
+
+/** 当前状态在主界面展示的唯一主要操作。 */
+export const NEXT_ACTION_LABEL: Record<UnitStatus, string | null> = {
+  pending: "确认到货",
+  arrived: "寄往得物",
+  shipping: "确认入仓",
+  in_stock_dewu: "登记售出",
+  sold: "录入到手价",
+  settled: "修改到手价",
+  returned: "处理退回",
+  refunded: null,
+};
+
+/** 纠错入口只包含无需专用金额表单的目标；特殊状态仍走业务操作。 */
+export const CORRECTION_STATUS_TARGETS = [
+  "pending",
+  "arrived",
+  "in_stock_dewu",
+  "sold",
+  "returned",
+] as const satisfies readonly UnitStatus[];
 
 /** 销售相关状态（持有销售记录的状态） */
 export const SALE_STATUSES: UnitStatus[] = ["sold", "settled"];

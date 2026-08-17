@@ -11,6 +11,7 @@ import {
   type UnitGroup,
 } from "@/lib/utils/group";
 import { BoxIcon } from "./icons";
+import { workflowActionLabel } from "./UnitWorkflowSheet";
 
 export default function GroupCard({
   group,
@@ -19,7 +20,7 @@ export default function GroupCard({
   selectable,
   selected,
   onToggle,
-  onSettle,
+  onProcess,
   statusScope,
   showPlatform = true,
 }: {
@@ -29,7 +30,7 @@ export default function GroupCard({
   selectable: boolean;
   selected: boolean;
   onToggle: () => void;
-  onSettle?: (units: UnitGroup["units"]) => void;
+  onProcess?: (units: UnitGroup["units"]) => void;
   statusScope?: GroupSelection["scope"];
   showPlatform?: boolean;
 }) {
@@ -40,7 +41,9 @@ export default function GroupCard({
   const platformText = group.platforms
     .map((platform) => PLATFORM_LABELS[platform])
     .join(" · ");
-  const settlementUnits = group.units.filter((unit) => unit.status === "sold");
+  const actionableUnits = group.units.filter(
+    (unit) => unit.status !== "refunded",
+  );
   const className = `flex min-w-0 w-full max-w-full gap-3 overflow-hidden rounded-[28px] border border-separator bg-card p-4 text-left shadow-[var(--cirrus-shadow-1)] active:bg-background ${
     selected ? "ring-2 ring-tint" : ""
   }`;
@@ -123,14 +126,14 @@ export default function GroupCard({
       >
         {content}
       </Link>
-      {settlementUnits.length > 0 && onSettle && (
+      {actionableUnits.length > 0 && onProcess && (
         <div className="border-t border-separator px-3 py-2.5">
           <button
             type="button"
-            onClick={() => onSettle(settlementUnits)}
+            onClick={() => onProcess(actionableUnits)}
             className="min-h-11 w-full rounded-full bg-label px-3 text-[15px] font-medium text-card"
           >
-            录到手价 · {settlementUnits.length} 件待结算
+            {workflowActionLabel(actionableUnits)}
           </button>
         </div>
       )}

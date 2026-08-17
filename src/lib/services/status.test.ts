@@ -60,7 +60,10 @@ describe("status and sale integrity", () => {
     });
     const settled = db.snapshot().units[0];
 
-    await changeUnitStatus(db, settled, "sold");
+    await expect(changeUnitStatus(db, settled, "sold")).rejects.toThrow(
+      "不能直接执行",
+    );
+    await changeUnitStatus(db, settled, "sold", { allowCorrection: true });
 
     const state = db.snapshot();
     expect(state.units[0].status).toBe("sold");

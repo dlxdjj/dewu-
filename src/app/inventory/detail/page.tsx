@@ -4,19 +4,22 @@ import { Suspense, useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import Card from "@/components/ui/Card";
-import BatchShippingSheet from "@/components/ui/BatchShippingSheet";
-import StatusChips from "@/components/ui/StatusChips";
-import SaleFormSheet from "@/components/ui/SaleFormSheet";
 import DeleteUnitSheet from "@/components/ui/DeleteUnitSheet";
 import Sheet from "@/components/ui/Sheet";
+import UnitWorkflowSheet from "@/components/ui/UnitWorkflowSheet";
+import { useAppData } from "@/components/AppDataProvider";
 import { getDb } from "@/lib/data";
 import { changeUnitStatus, refundUnit } from "@/lib/services/status";
 import { deleteUnitDeep } from "@/lib/services/maintenance";
-import { shipUnits } from "@/lib/services/shipping";
 import { formatCents, formatSignedCents } from "@/lib/utils/money";
 import { unitProfit } from "@/lib/utils/profit";
 import type { UnitJoined } from "@/lib/types/database";
-import type { UnitStatus } from "@/lib/constants/status";
+import {
+  CORRECTION_STATUS_TARGETS,
+  NEXT_ACTION_LABEL,
+  STATUS_META,
+  type UnitStatus,
+} from "@/lib/constants/status";
 
 export default function DetailPage() {
   return (
@@ -38,10 +41,14 @@ function Detail() {
   const params = useSearchParams();
   const id = params.get("id") ?? "";
   const router = useRouter();
+  const shared = useAppData();
   const [unit, setUnit] = useState<UnitJoined | null>(null);
   const [error, setError] = useState("");
-  const [sale, setSale] = useState(false);
-  const [shipping, setShipping] = useState(false);
+  const [notice, setNotice] = useState("");
+  const [workflow, setWorkflow] = useState(false);
+  const [more, setMore] = useState(false);
+  const [correcting, setCorrecting] = useState(false);
+  const [correctionTarget, setCorrectionTarget] = useState<UnitStatus>("arrived");
   const [refund, setRefund] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -90,43 +97,6 @@ function Detail() {
 
   const profit = unitProfit(unit, unit.sale);
 
-  async function select(to: UnitStatus) {
-    if (!unit) return;
-    if (to === "settled") {
-      setSale(true);
-      return;
-    }
-    if (to === "shipping") {
-      if (
-        (unit.status === "sold" || unit.status === "settled") &&
-        !window.confirm("重新寄出会删除已有的销售和利润记录，确认继续？")
-      ) {
-        return;
-      }
-      setShipping(true);
-      return;
-    }
-    if (to === "refunded") {
-      setRefund(true);
-      return;
-    }
-    if (
-      (unit.status === "sold" || unit.status === "settled") &&
-      !window.confirm("修改销售状态会删除或重置已有的销售和利润记录，确认继续？")
-    ) {
-      return;
-    }
-    setBusy(true);
-    try {
-      await changeUnitStatus(getDb(), unit, to);
-      await load();
-    } catch (reason) {
-      setError(reason instanceof Error ? reason.message : "操作失败");
-    } finally {
-      setBusy(false);
-    }
-  }
-
   return (
     <>
       <Link href="/inventory" className="text-tint">
@@ -152,58 +122,137 @@ function Detail() {
         />
         <Row label="实际利润" value={formatSignedCents(profit.value)} />
       </Card>
-      <p className="mb-2 mt-5 text-sm text-muted">
-        选择寄出时会先录入本件运费
-      </p>
-      <Card>
-        <StatusChips current={unit.status} onSelect={select} />
-        {busy && <p className="mt-2 text-center text-xs text-muted">处理中…</p>}
+      <Card className="mt-4">
+        <div className="flex items-center justify-between gap-3">
+          <span className="text-sm text-muted">当前状态</span>
+          <span className="rounded-full bg-background px-3 py-1.5 text-sm font-medium">
+            {STATUS_META[unit.status].label}
+          </span>
+        </div>
+        {NEXT_ACTION_LABEL[unit.status] && (
+          <button
+            type="button"
+            onClick={() => setWorkflow(true)}
+            className="mt-4 min-h-12 w-full rounded-xl bg-label text-[15px] font-medium text-card"
+          >
+            {NEXT_ACTION_LABEL[unit.status]}
+          </button>
+        )}
       </Card>
-      <div className="mt-5 grid grid-cols-2 gap-2">
-        <button
-          onClick={() => setRefund(true)}
-          className="rounded-xl bg-[#FFF3CD] py-3 text-sm text-[#8a6d00]"
-        >
-          采购退货退款
-        </button>
-        <button
-          onClick={() => setDeleting(true)}
-          className="rounded-xl bg-danger/10 py-3 text-sm text-danger"
-        >
-          删除此记录
-        </button>
-      </div>
+      <button
+        type="button"
+        onClick={() => setMore(true)}
+        className="mt-4 min-h-12 w-full rounded-xl border border-separator bg-card text-sm text-muted"
+      >
+        更多操作
+      </button>
+      {notice && (
+        <p role="status" aria-live="polite" className="mt-3 text-center text-sm text-muted">
+          {notice}
+        </p>
+      )}
       {error && (
         <p role="alert" className="mt-3 text-center text-sm text-danger">
           {error}
         </p>
       )}
-      {sale && (
-        <SaleFormSheet
+      {workflow && (
+        <UnitWorkflowSheet
           units={[unit]}
-          onClose={() => setSale(false)}
-          onDone={async () => {
-            setSale(false);
+          onClose={() => setWorkflow(false)}
+          onDone={async (message) => {
+            setWorkflow(false);
+            setNotice(message);
+            await shared?.refresh();
             await load();
           }}
         />
       )}
-      {shipping && (
-        <BatchShippingSheet
-          units={[unit]}
-          onClose={() => setShipping(false)}
-          onConfirm={async (totalShippingCents, mode, shippedAt) => {
-            await shipUnits(getDb(), {
-              unitIds: [unit.id],
-              totalShippingCents,
-              mode,
-              shippedAt,
-            });
-            setShipping(false);
-            await load();
+      <Sheet open={more} title="更多操作" onClose={() => setMore(false)}>
+        <div className="space-y-2">
+          {unit.status !== "refunded" && (
+            <button
+              type="button"
+              onClick={() => {
+                const fallback = CORRECTION_STATUS_TARGETS.find((status) => status !== unit.status) ?? "arrived";
+                setCorrectionTarget(fallback);
+                setMore(false);
+                setCorrecting(true);
+              }}
+              className="min-h-12 w-full rounded-xl bg-background text-[15px]"
+            >
+              纠正库存状态
+            </button>
+          )}
+          {unit.status !== "refunded" && (
+            <button
+              type="button"
+              onClick={() => {
+                setMore(false);
+                setRefund(true);
+              }}
+              className="min-h-12 w-full rounded-xl bg-danger/10 text-[15px] text-danger"
+            >
+              采购退货退款
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={() => {
+              setMore(false);
+              setDeleting(true);
+            }}
+            className="min-h-12 w-full rounded-xl bg-danger/10 text-[15px] text-danger"
+          >
+            删除此记录
+          </button>
+        </div>
+      </Sheet>
+      <Sheet open={correcting} title="纠正库存状态" onClose={() => setCorrecting(false)}>
+        <p className="mb-3 text-sm leading-6 text-muted">
+          只在之前误操作时使用。纠正销售相关状态可能删除或重置到手价和利润记录。
+        </p>
+        <label className="block text-sm">
+          目标状态
+          <select
+            aria-label="纠正后的状态"
+            value={correctionTarget}
+            onChange={(event) => setCorrectionTarget(event.target.value as UnitStatus)}
+            className="mt-1 min-h-12 w-full rounded-xl bg-background px-3 text-base"
+          >
+            {CORRECTION_STATUS_TARGETS.filter((status) => status !== unit.status).map((status) => (
+              <option key={status} value={status}>{STATUS_META[status].label}</option>
+            ))}
+          </select>
+        </label>
+        {error && <p role="alert" className="mt-3 text-center text-sm text-danger">{error}</p>}
+        <button
+          type="button"
+          disabled={busy}
+          onClick={async () => {
+            if (!window.confirm(`确认把状态纠正为“${STATUS_META[correctionTarget].label}”？`)) return;
+            setBusy(true);
+            setError("");
+            try {
+              await changeUnitStatus(getDb(), unit, correctionTarget, {
+                allowCorrection: true,
+                note: `手动纠正为${STATUS_META[correctionTarget].label}`,
+              });
+              setCorrecting(false);
+              setNotice(`状态已纠正为${STATUS_META[correctionTarget].label}`);
+              await shared?.refresh();
+              await load();
+            } catch (reason) {
+              setError(reason instanceof Error ? reason.message : "状态纠正失败");
+            } finally {
+              setBusy(false);
+            }
           }}
-        />
-      )}
+          className="mt-3 min-h-12 w-full rounded-xl bg-label text-card disabled:opacity-40"
+        >
+          {busy ? "处理中…" : "确认纠正状态"}
+        </button>
+      </Sheet>
       <Sheet
         open={refund}
         title="采购退货退款"
@@ -220,6 +269,8 @@ function Detail() {
             try {
               await refundUnit(getDb(), unit.id, "采购平台退货退款");
               setRefund(false);
+              setNotice("采购退款已完成");
+              await shared?.refresh();
               await load();
             } catch (reason) {
               setError(reason instanceof Error ? reason.message : "退款失败");
@@ -247,6 +298,7 @@ function Detail() {
                   `${result.pendingStoragePaths.length} 个附件待清理`,
                 );
               }
+              await shared?.refresh();
               router.replace("/inventory");
             } catch (reason) {
               setError(reason instanceof Error ? reason.message : "删除失败");

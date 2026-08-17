@@ -1,26 +1,22 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import BatchShippingSheet from "@/components/ui/BatchShippingSheet";
 import Card from "@/components/ui/Card";
 import EmptyState from "@/components/ui/EmptyState";
 import GroupCard from "@/components/ui/GroupCard";
 import PageHeader from "@/components/ui/PageHeader";
-import SaleFormSheet from "@/components/ui/SaleFormSheet";
 import Sheet from "@/components/ui/Sheet";
+import UnitWorkflowSheet, { workflowActionLabel } from "@/components/ui/UnitWorkflowSheet";
 import { useAppData } from "@/components/AppDataProvider";
 import { loadProductImageUrls } from "@/lib/catalog";
 import { PLATFORM_LABELS, PLATFORMS } from "@/lib/constants/platform";
 import {
   ACTIVE_STATUSES,
-  BATCH_STATUS_TARGETS,
   STATUS_META,
   type UnitStatus,
 } from "@/lib/constants/status";
 import { getDb } from "@/lib/data";
 import type { DbAdapter } from "@/lib/data/types";
-import { shipUnits } from "@/lib/services/shipping";
-import { batchChangeStatus } from "@/lib/services/status";
 import type { UnitJoined } from "@/lib/types/database";
 import {
   buildGroups,
@@ -53,13 +49,10 @@ export default function InventoryPage({
   const [filterOpen, setFilterOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState("");
-  const [actionError, setActionError] = useState("");
+  const [notice, setNotice] = useState("");
   const [selecting, setSelecting] = useState(false);
   const [selected, setSelected] = useState(new Set<string>());
-  const [shipping, setShipping] = useState(false);
-  const [settlementUnits, setSettlementUnits] = useState<UnitJoined[] | null>(null);
-  const [changingStatus, setChangingStatus] = useState(false);
-  const [target, setTarget] = useState<UnitStatus>("arrived");
+  const [workflowUnits, setWorkflowUnits] = useState<UnitJoined[] | null>(null);
   const shared = useAppData();
   const bulk = !dataSource && shared?.data?.preferences.workflow === "bulk";
 
@@ -166,7 +159,6 @@ export default function InventoryPage({
   function resetSelection(): void {
     setSelecting(false);
     setSelected(new Set());
-    setActionError("");
   }
 
   function switchView(next: InventoryView): void {
@@ -187,26 +179,12 @@ export default function InventoryPage({
     });
   }
 
-  async function done(): Promise<void> {
-    setShipping(false);
-    setSettlementUnits(null);
+  async function done(message: string): Promise<void> {
+    setWorkflowUnits(null);
+    setNotice(message);
     resetSelection();
     if (!dataSource && shared) await shared.refresh();
     else await load();
-  }
-
-  function prepareShipping(candidates: UnitJoined[]): void {
-    setActionError("");
-    if (!candidates.length) return;
-    if (candidates.some((unit) => unit.status === "sold" || unit.status === "settled") &&
-      !window.confirm("重新寄出会删除所选商品已有的销售和利润记录，确认继续？")) return;
-    setShipping(true);
-  }
-
-  function prepareSettlement(candidates: UnitJoined[]): void {
-    if (!candidates.length) return;
-    setActionError("");
-    setSettlementUnits(candidates);
   }
 
   return (
@@ -239,6 +217,12 @@ export default function InventoryPage({
           </button>
         ))}
       </nav>
+
+      {notice && (
+        <p role="status" aria-live="polite" className="mb-3 rounded-xl bg-card px-3 py-2 text-center text-sm text-muted shadow-[var(--cirrus-shadow-1)]">
+          {notice}
+        </p>
+      )}
 
       {!loading && units.length > 0 && (
         <div className="mb-3 flex gap-2">
@@ -306,7 +290,7 @@ export default function InventoryPage({
               selectable={selecting}
               selected={group.units.every((unit) => selected.has(unit.id))}
               onToggle={() => toggleGroup(group)}
-              onSettle={view === "settlement" ? prepareSettlement : undefined}
+              onProcess={view === "refunds" ? undefined : setWorkflowUnits}
               statusScope={
                 view === "active"
                   ? statusFilter === "all" ? "active" : statusFilter
@@ -324,33 +308,14 @@ export default function InventoryPage({
           <div className="fixed inset-x-3 bottom-[calc(78px+env(safe-area-inset-bottom))] z-40 mx-auto max-w-3xl rounded-[28px] border border-separator bg-card p-3 shadow-[var(--cirrus-shadow-2)]">
             <div className="flex flex-col gap-2">
               <span className="text-center text-sm text-muted">已选 {selected.size} 件</span>
-              {actionError && <p role="alert" className="rounded-lg bg-danger/10 px-3 py-2 text-sm text-danger">{actionError}</p>}
-              <div className="grid grid-cols-2 gap-2">
-                <button disabled={!selected.size} onClick={() => prepareShipping(chosen)} className="min-h-11 rounded-xl bg-tint text-[15px] text-white disabled:opacity-40">批量寄出</button>
-                <button disabled={!selected.size} onClick={() => prepareSettlement(chosen)} className="min-h-11 rounded-xl bg-label text-[15px] text-white disabled:opacity-40">批量录到手价</button>
-              </div>
-              <div className="flex gap-2">
-                <select aria-label="目标状态" value={target} onChange={(event) => setTarget(event.target.value as UnitStatus)} className="min-h-11 min-w-0 flex-1 rounded-xl bg-background px-3 text-[15px]">
-                  {BATCH_STATUS_TARGETS.map((status) => <option key={status} value={status}>{STATUS_META[status].label}</option>)}
-                </select>
-                <button
-                  type="button"
-                  disabled={!selected.size || changingStatus}
-                  onClick={async () => {
-                    if (target === "shipping") return prepareShipping(chosen);
-                    if (chosen.some((unit) => unit.status === "sold" || unit.status === "settled") &&
-                      !window.confirm("修改销售状态会删除或重置已有的销售和利润记录，确认继续？")) return;
-                    setChangingStatus(true);
-                    setActionError("");
-                    try { await batchChangeStatus(resolveDb(), chosen, target); await done(); }
-                    catch (reason) { setActionError(reason instanceof Error ? reason.message : "状态修改失败"); }
-                    finally { setChangingStatus(false); }
-                  }}
-                  className="min-h-11 shrink-0 rounded-xl bg-label px-5 text-[15px] text-white disabled:opacity-40"
-                >
-                  {changingStatus ? "处理中…" : target === "shipping" ? "填写运费" : "修改状态"}
-                </button>
-              </div>
+              <button
+                type="button"
+                disabled={!selected.size}
+                onClick={() => setWorkflowUnits(chosen)}
+                className="min-h-12 w-full rounded-xl bg-label px-4 text-[15px] font-medium text-card disabled:opacity-40"
+              >
+                {selected.size ? workflowActionLabel(chosen) : "请先选择商品"}
+              </button>
             </div>
           </div>
         </>
@@ -387,17 +352,14 @@ export default function InventoryPage({
         </div>
       </Sheet>
 
-      {shipping && (
-        <BatchShippingSheet
-          units={chosen}
-          onClose={() => setShipping(false)}
-          onConfirm={async (total, mode, shippedAt) => {
-            await shipUnits(resolveDb(), { unitIds: chosen.map((unit) => unit.id), totalShippingCents: total, mode, shippedAt });
-            await done();
-          }}
+      {workflowUnits && (
+        <UnitWorkflowSheet
+          units={workflowUnits}
+          dataSource={dataSource}
+          onClose={() => setWorkflowUnits(null)}
+          onDone={done}
         />
       )}
-      {settlementUnits && <SaleFormSheet units={settlementUnits} dataSource={dataSource} onClose={() => setSettlementUnits(null)} onDone={done} />}
     </>
   );
 }

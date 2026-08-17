@@ -4,18 +4,17 @@ import { Suspense, useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import Card from "@/components/ui/Card";
-import SaleFormSheet from "@/components/ui/SaleFormSheet";
 import SizeAssignmentSheet from "@/components/ui/SizeAssignmentSheet";
+import UnitWorkflowSheet, { workflowActionLabel } from "@/components/ui/UnitWorkflowSheet";
 import { useAppData } from "@/components/AppDataProvider";
 import {
   PLATFORM_LABELS,
   PLATFORMS,
   type Platform,
 } from "@/lib/constants/platform";
-import { STATUS_META, UNIT_STATUSES, type UnitStatus } from "@/lib/constants/status";
+import { NEXT_ACTION_LABEL, STATUS_META, UNIT_STATUSES, type UnitStatus } from "@/lib/constants/status";
 import { getDb } from "@/lib/data";
 import type { DbAdapter } from "@/lib/data/types";
-import { deleteUnitDeep } from "@/lib/services/maintenance";
 import type { UnitJoined } from "@/lib/types/database";
 import { type GroupSelection, matchesGroup } from "@/lib/utils/group";
 import { formatCents } from "@/lib/utils/money";
@@ -72,9 +71,8 @@ function GroupContent({
   const [units, setUnits] = useState<UnitJoined[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const [settlementUnits, setSettlementUnits] = useState<UnitJoined[] | null>(
-    null,
-  );
+  const [workflowUnits, setWorkflowUnits] = useState<UnitJoined[] | null>(null);
+  const [notice, setNotice] = useState("");
   const [refresh, setRefresh] = useState(0);
   const [assigningSize, setAssigningSize] = useState(false);
   const shared = useAppData();
@@ -145,9 +143,11 @@ function GroupContent({
   const awaitingSettlement = units.filter((unit) => unit.status === "sold");
   const missingSizeUnits = units.filter((unit) => !unit.size.trim());
 
-  async function settlementDone(): Promise<void> {
-    setSettlementUnits(null);
+  async function workflowDone(message: string): Promise<void> {
+    setWorkflowUnits(null);
+    setNotice(message);
     setRefresh((value) => value + 1);
+    await shared?.refresh();
   }
 
   return (
@@ -169,10 +169,10 @@ function GroupContent({
         {awaitingSettlement.length > 0 && (
           <button
             type="button"
-            onClick={() => setSettlementUnits(awaitingSettlement)}
+            onClick={() => setWorkflowUnits(awaitingSettlement)}
             className="mt-3 min-h-11 w-full rounded-xl bg-[#1B7F37] px-3 text-[15px] font-medium text-white"
           >
-            批量录到手价 · {awaitingSettlement.length} 件待结算
+            {workflowActionLabel(awaitingSettlement)}
           </button>
         )}
         {missingSizeUnits.length > 0 && (
@@ -185,6 +185,11 @@ function GroupContent({
           </button>
         )}
       </Card>
+      {notice && (
+        <p role="status" aria-live="polite" className="mt-3 rounded-xl bg-card px-3 py-2 text-center text-sm text-muted">
+          {notice}
+        </p>
+      )}
       <div className="mt-3 space-y-2">
         {units.map((unit, index) => (
           <div key={unit.id} className="rounded-xl bg-card p-3">
@@ -199,42 +204,21 @@ function GroupContent({
                 ` · 到手 ${formatCents(unit.sale.actual_payout_cents)}`}
             </p>
             <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-2">
-              {(unit.status === "sold" || unit.status === "settled") && (
+              {NEXT_ACTION_LABEL[unit.status] && (
                 <button
                   type="button"
-                  onClick={() => setSettlementUnits([unit])}
-                  className="min-h-11 text-[15px] font-medium text-[#1B7F37]"
+                  onClick={() => setWorkflowUnits([unit])}
+                  className="min-h-11 rounded-full bg-label px-4 text-[15px] font-medium text-card"
                 >
-                  {unit.status === "settled" ? "修改到手价" : "录到手价"}
+                  {NEXT_ACTION_LABEL[unit.status]}
                 </button>
               )}
               <Link
                 href={`/inventory/detail?id=${unit.id}`}
                 className="inline-flex min-h-11 items-center text-[15px] text-tint"
               >
-                查看详情
+                详情与更多
               </Link>
-              <button
-                type="button"
-                onClick={async () => {
-                  if (!confirm("永久删除一件库存？已售/结算会影响利润报表。")) {
-                    return;
-                  }
-                  try {
-                    await deleteUnitDeep(resolveDb(), unit.id);
-                    setUnits((old) =>
-                      old.filter((item) => item.id !== unit.id),
-                    );
-                  } catch (reason) {
-                    setError(
-                      reason instanceof Error ? reason.message : "删除失败",
-                    );
-                  }
-                }}
-                className="ml-auto min-h-11 text-[15px] text-danger"
-              >
-                删除一件
-              </button>
             </div>
           </div>
         ))}
@@ -244,12 +228,12 @@ function GroupContent({
           {error}
         </p>
       )}
-      {settlementUnits && (
-        <SaleFormSheet
-          units={settlementUnits}
+      {workflowUnits && (
+        <UnitWorkflowSheet
+          units={workflowUnits}
           dataSource={dataSource}
-          onClose={() => setSettlementUnits(null)}
-          onDone={settlementDone}
+          onClose={() => setWorkflowUnits(null)}
+          onDone={workflowDone}
         />
       )}
       {assigningSize && (

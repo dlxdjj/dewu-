@@ -31,7 +31,10 @@ describe("InventoryGroupPage", () => {
       screen.getByText("第 3 件 · 拼多多 · 进价 ¥120.00"),
     ).toBeInTheDocument();
     expect(screen.getByText("发往得物途中 · 寄出运费 ¥0.00")).toBeInTheDocument();
-    expect(screen.getAllByRole("link", { name: "查看详情" })).toHaveLength(3);
+    expect(screen.getAllByRole("link", { name: "详情与更多" })).toHaveLength(3);
+    expect(screen.getByRole("button", { name: "寄往得物" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "确认入仓" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "确认到货" })).toBeInTheDocument();
   });
 
   it("honors the optional platform scope in a group link", async () => {
@@ -85,10 +88,10 @@ describe("InventoryGroupPage", () => {
 
     await userEvent.click(
       await screen.findByRole("button", {
-        name: "批量录到手价 · 2 件待结算",
+        name: "录入到手价 · 2 件",
       }),
     );
-    expect(screen.getAllByRole("button", { name: "录到手价" })).toHaveLength(
+    expect(screen.getAllByRole("button", { name: "录入到手价" })).toHaveLength(
       2,
     );
     await userEvent.type(screen.getByLabelText("实际到手价"), "130");

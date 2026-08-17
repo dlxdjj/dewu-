@@ -549,20 +549,20 @@ test("390px inventory supports quick batch settlement and shipping with freight"
   await page.goto("/inventory/");
   await page.getByRole("button", { name: "待结算 2" }).click();
   await expect(
-    page.getByRole("button", { name: "录到手价 · 2 件待结算" }),
+    page.getByRole("button", { name: "录入到手价 · 2 件" }),
   ).toBeVisible();
   await page
-    .getByRole("button", { name: "录到手价 · 2 件待结算" })
+    .getByRole("button", { name: "录入到手价 · 2 件" })
     .click();
   const payout = page.getByLabel("实际到手价");
   expect(await payout.evaluate((node) => getComputedStyle(node).fontSize)).toBe(
     "16px",
   );
   await payout.fill("160");
-  await expect(page.getByText("实际到账合计 ¥320.00")).toBeVisible();
+  await expect(page.getByText("2 件到账合计 ¥320.00")).toBeVisible();
   await page.getByRole("button", { name: "确认到手价并结算" }).click();
   await expect(
-    page.getByRole("button", { name: "录到手价 · 2 件待结算" }),
+    page.getByRole("button", { name: "录入到手价 · 2 件" }),
   ).not.toBeVisible();
 
   await page.getByRole("button", { name: "当前库存 1" }).click();
@@ -574,8 +574,7 @@ test("390px inventory supports quick batch settlement and shipping with freight"
   await page
     .getByRole("button", { name: "选择 E2E-1 42，共 1 件" })
     .click();
-  await page.getByLabel("目标状态").selectOption("shipping");
-  await page.getByRole("button", { name: "填写运费" }).click();
+  await page.getByRole("button", { name: "寄往得物" }).click();
   const freight = page.getByLabel("寄出快递费");
   expect(await freight.evaluate((node) => getComputedStyle(node).fontSize)).toBe(
     "16px",

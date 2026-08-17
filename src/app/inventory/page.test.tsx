@@ -1,6 +1,6 @@
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 import { MemoryDbAdapter } from "@/lib/data/memory";
 import { makeInventorySeed } from "@/test/inventory-fixtures";
 import InventoryPage from "./page";
@@ -67,25 +67,27 @@ describe("InventoryPage", () => {
     );
 
     expect(screen.getByText("已选 3 件")).toBeInTheDocument();
-    const target = screen.getByLabelText("目标状态");
-    expect(target).toHaveTextContent("发往得物途中");
-    expect(target).not.toHaveTextContent("已结算");
-    expect(target).not.toHaveTextContent("退款");
+    expect(screen.queryByLabelText("目标状态")).not.toBeInTheDocument();
+    await userEvent.click(
+      screen.getByRole("button", { name: "处理下一步 · 3 件" }),
+    );
+    expect(screen.getByRole("heading", { name: "处理下一步（3 件）" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /寄往得物.*1 件/ })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /确认入仓.*1 件/ })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /确认到货.*1 件/ })).toBeInTheDocument();
   });
 
-  it("opens freight entry when shipping is chosen as the batch target", async () => {
-    const db = new MemoryDbAdapter(makeInventorySeed());
+  it("opens freight entry directly for a batch that is ready to ship", async () => {
+    const seed = makeInventorySeed();
+    seed.units!.forEach((unit) => { unit.status = "arrived"; });
+    const db = new MemoryDbAdapter(seed);
     render(<InventoryPage dataSource={db} />);
     await screen.findByText("×3");
     await userEvent.click(screen.getByRole("button", { name: "批量操作" }));
     await userEvent.click(
       screen.getByRole("button", { name: "选择 AB-1 42，共 3 件" }),
     );
-    await userEvent.selectOptions(
-      screen.getByLabelText("目标状态"),
-      "shipping",
-    );
-    await userEvent.click(screen.getByRole("button", { name: "填写运费" }));
+    await userEvent.click(screen.getByRole("button", { name: "寄往得物 · 3 件" }));
 
     expect(
       screen.getByRole("heading", { name: "批量寄出（3 件）" }),
@@ -133,11 +135,11 @@ describe("InventoryPage", () => {
     );
     await userEvent.click(
       await screen.findByRole("button", {
-        name: "录到手价 · 2 件待结算",
+        name: "录入到手价 · 2 件",
       }),
     );
     await userEvent.type(screen.getByLabelText("实际到手价"), "150");
-    expect(screen.getByText("实际到账合计 ¥300.00")).toBeInTheDocument();
+    expect(screen.getByText("2 件到账合计 ¥300.00")).toBeInTheDocument();
     await userEvent.click(
       screen.getByRole("button", { name: "确认到手价并结算" }),
     );
@@ -163,10 +165,9 @@ describe("InventoryPage", () => {
     expect(screen.queryByRole("button", { name: "批量操作" })).not.toBeInTheDocument();
   });
 
-  it("warns before a batch status action deletes financial records", async () => {
+  it("only offers payout entry for sold selections instead of arbitrary state changes", async () => {
     const seed = makeInventorySeed();
     seed.units![0].status = "sold";
-    const confirm = vi.spyOn(window, "confirm").mockReturnValue(false);
     render(<InventoryPage dataSource={new MemoryDbAdapter(seed)} />);
     await userEvent.click(await screen.findByRole("button", { name: "待结算 1" }));
     await screen.findByText("×1");
@@ -174,13 +175,10 @@ describe("InventoryPage", () => {
     await userEvent.click(
       screen.getByRole("button", { name: "选择 AB-1 42，共 1 件" }),
     );
-    await userEvent.click(screen.getByRole("button", { name: "批量寄出" }));
-
-    expect(confirm).toHaveBeenCalledWith(
-      "重新寄出会删除所选商品已有的销售和利润记录，确认继续？",
-    );
+    expect(screen.queryByLabelText("目标状态")).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "录入到手价" }));
+    expect(screen.getByRole("heading", { name: "登记实际到手价" })).toBeInTheDocument();
     expect(screen.queryByLabelText("总快递费")).not.toBeInTheDocument();
-    confirm.mockRestore();
   });
 
   it("shows the latest signed product image on the merged card", async () => {
