@@ -134,7 +134,7 @@ function Detail() {
       </Link>
       <h1 className="mt-2 text-xl font-bold">{unit.product.name}</h1>
       <p className="text-sm text-muted">
-        {unit.size} · {unit.product.style_code || "无货号"}
+        {unit.size || "待补尺码"} · {unit.product.style_code || "无货号"}
       </p>
       <Card className="mt-4 space-y-2 text-sm">
         <Row label="单件进价" value={formatCents(unit.unit_cost_cents)} />

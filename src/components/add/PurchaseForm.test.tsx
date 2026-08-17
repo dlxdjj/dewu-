@@ -147,4 +147,71 @@ describe("PurchaseForm", () => {
     expect(input).toHaveClass("mobile-date-input");
     expect(input.parentElement).toHaveClass("date-input-shell");
   });
+
+  it("lets a bulk account omit size and hides purchase platform", async () => {
+    const db = new MemoryDbAdapter({
+      preferences: {
+        user_id: "test-user",
+        workflow: "bulk",
+        updated_at: timestamp,
+      },
+    });
+    const onComplete = vi.fn();
+    render(
+      <PurchaseForm
+        dataSource={db}
+        showPlatform={false}
+        allowMissingSize
+        onComplete={onComplete}
+      />,
+    );
+    expect(screen.queryByLabelText("采购平台")).not.toBeInTheDocument();
+    expect(screen.getByLabelText("尺码（可后补）")).not.toBeRequired();
+    const user = userEvent.setup();
+    await user.type(screen.getByLabelText("品名（必填）"), "测试鞋");
+    await user.type(screen.getByLabelText("货号（必填）"), "BULK-1");
+    await user.type(screen.getByLabelText("单件进价（元，必填）"), "88.80");
+    await user.click(screen.getByRole("button", { name: /保存并生成/ }));
+    await waitFor(() => expect(onComplete).toHaveBeenCalledTimes(1));
+    expect(db.snapshot().units[0].size).toBe("");
+    expect(db.snapshot().batches[0].platform).toBe("other");
+  });
+
+  it("fills the canonical name and image when a bulk account enters a known style code", async () => {
+    const db = new MemoryDbAdapter({
+      preferences: {
+        user_id: "test-user",
+        workflow: "bulk",
+        updated_at: timestamp,
+      },
+      catalogProducts: [{
+        id: "catalog-1",
+        normalized_style_code: "HP-5969",
+        display_style_code: "HP-5969",
+        canonical_name: "阿迪达斯 HP5969 运动鞋",
+        image_path: "owner/product/hp-5969",
+        source_user_id: "owner",
+        verified_at: timestamp,
+        created_at: timestamp,
+        updated_at: timestamp,
+      }],
+    });
+    render(
+      <PurchaseForm
+        dataSource={db}
+        showPlatform={false}
+        allowMissingSize
+        onComplete={vi.fn()}
+      />,
+    );
+
+    await userEvent.type(screen.getByLabelText("货号（必填）"), " hp‑5969 ");
+
+    expect(await screen.findByDisplayValue("阿迪达斯 HP5969 运动鞋")).toBeInTheDocument();
+    expect(screen.getByText("已按货号匹配标准名称和商品图片")).toBeInTheDocument();
+    expect(screen.getByRole("img", { name: /已有商品图片/ })).toHaveAttribute(
+      "src",
+      "memory://owner/product/hp-5969",
+    );
+  });
 });

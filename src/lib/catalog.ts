@@ -4,7 +4,11 @@ import type { Attachment, Product } from "@/lib/types/database";
 const signedUrlCache = new Map<string, { url: string; expiresAt: number }>();
 
 export function normalizeStyleCode(value: string | null | undefined): string {
-  return (value ?? "").trim().toLocaleLowerCase();
+  return (value ?? "")
+    .trim()
+    .replace(/[‐‑‒–—−]/g, "-")
+    .replace(/\s+/g, "")
+    .toLocaleUpperCase();
 }
 
 export function findProductByStyleCode(
@@ -42,27 +46,38 @@ export function latestProductImageByOwner(
 }
 
 export async function loadProductImageUrls(
-  db: Pick<DbAdapter, "listAttachments" | "attachmentUrl">,
-  productIds: Iterable<string>,
+  db: Pick<
+    DbAdapter,
+    "listAttachments" | "attachmentUrl" | "listCatalogProducts" | "catalogImageUrl"
+  >,
+  products: Iterable<Product>,
 ): Promise<Map<string, string>> {
-  const wanted = new Set(productIds);
-  if (!wanted.size) return new Map();
+  const wanted = [...products];
+  if (!wanted.length) return new Map();
   const latest = latestProductImageByOwner(await db.listAttachments("product"));
+  const catalogs = await db.listCatalogProducts().catch(() => []);
+  const catalogMap = new Map(catalogs.map((catalog) => [catalog.id, catalog]));
   const pairs = await Promise.all(
-    [...wanted].map(async (productId) => {
-      const attachment = latest.get(productId);
-      if (!attachment) return null;
+    wanted.map(async (product) => {
+      const attachment = latest.get(product.id);
       try {
-        const cached = signedUrlCache.get(attachment.path);
+        const catalog = product.catalog_product_id
+          ? catalogMap.get(product.catalog_product_id)
+          : undefined;
+        const path = attachment?.path ?? catalog?.image_path;
+        if (!path) return null;
+        const cached = signedUrlCache.get(path);
         if (cached && cached.expiresAt > Date.now()) {
-          return [productId, cached.url] as const;
+          return [product.id, cached.url] as const;
         }
-        const url = await db.attachmentUrl(attachment);
-        signedUrlCache.set(attachment.path, {
+        const url = attachment
+          ? await db.attachmentUrl(attachment)
+          : await db.catalogImageUrl(catalog!);
+        signedUrlCache.set(path, {
           url,
           expiresAt: Date.now() + 12 * 60_000,
         });
-        return [productId, url] as const;
+        return [product.id, url] as const;
       } catch {
         return null;
       }

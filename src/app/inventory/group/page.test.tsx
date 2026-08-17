@@ -102,4 +102,48 @@ describe("InventoryGroupPage", () => {
     );
     expect(await screen.findAllByText("修改到手价")).toHaveLength(2);
   });
+
+  it("fills a missing size for every imported unit without recreating stock", async () => {
+    const db = new MemoryDbAdapter({
+      preferences: {
+        user_id: "test-user",
+        workflow: "bulk",
+        updated_at: "2026-08-17T00:00:00Z",
+      },
+    });
+    await db.createPurchase({
+      productName: "待补尺码商品",
+      styleCode: "SIZE-LATER",
+      platform: "other",
+      unitPriceCents: 10000,
+      quantity: 3,
+      purchasedAt: "2026-08-17",
+      size: "",
+      initialStatus: "arrived",
+      orderNo: "",
+      note: "",
+    });
+    render(
+      <InventoryGroupPage
+        dataSource={db}
+        initialQuery={{
+          styleCode: "SIZE-LATER",
+          productId: null,
+          size: "",
+          platform: null,
+        }}
+      />,
+    );
+
+    await userEvent.click(
+      await screen.findByRole("button", { name: "补充尺码 · 3 件" }),
+    );
+    await userEvent.type(screen.getByLabelText("第 1 组尺码"), "42");
+    await userEvent.click(screen.getByRole("button", { name: "确认保存尺码" }));
+
+    await waitFor(() =>
+      expect(db.snapshot().units.map((unit) => unit.size)).toEqual(["42", "42", "42"]),
+    );
+    expect(db.snapshot().units).toHaveLength(3);
+  });
 });

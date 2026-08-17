@@ -16,6 +16,7 @@ import {
   type OcrPrefill,
 } from "@/lib/ocr";
 import { PLATFORMS, type Platform } from "@/lib/constants/platform";
+import { useAppData } from "@/components/AppDataProvider";
 
 type Step = "pick" | "recognizing" | "confirm" | "failed";
 
@@ -28,6 +29,8 @@ export default function OcrPage() {
   const [fields, setFields] = useState<OcrPrefill>({});
   const [rawText, setRawText] = useState("");
   const [durationMs, setDurationMs] = useState(0);
+  const shared = useAppData();
+  const bulk = shared?.data?.preferences.workflow === "bulk";
 
   useEffect(() => () => { void disposeOcrWorker(); }, []);
 
@@ -50,7 +53,10 @@ export default function OcrPage() {
   }
 
   function confirm() {
-    sessionStorage.setItem(OCR_PREFILL_KEY, JSON.stringify(fields));
+    sessionStorage.setItem(
+      OCR_PREFILL_KEY,
+      JSON.stringify(bulk ? { ...fields, platform: "other" } : fields),
+    );
     router.push("/add");
   }
 
@@ -134,22 +140,24 @@ export default function OcrPage() {
                 <input type="text" inputMode="numeric" className={inputCls} value={fields.quantity ?? ""} onChange={(e) => set("quantity", e.target.value)} />
               </Field>
             </div>
-            <Field label="采购平台" optional>
-              <div className="flex flex-wrap gap-2">
-                {PLATFORMS.map((p) => (
-                  <button
-                    key={p.value}
-                    type="button"
-                    onClick={() => set("platform", p.value as Platform)}
-                    className={`rounded-full px-4 py-2 text-[14px] ${
-                      fields.platform === p.value ? "bg-label font-medium text-card" : "bg-background text-label"
-                    }`}
-                  >
-                    {p.label}
-                  </button>
-                ))}
-              </div>
-            </Field>
+            {!bulk && (
+              <Field label="采购平台" optional>
+                <div className="flex flex-wrap gap-2">
+                  {PLATFORMS.map((p) => (
+                    <button
+                      key={p.value}
+                      type="button"
+                      onClick={() => set("platform", p.value as Platform)}
+                      className={`rounded-full px-4 py-2 text-[14px] ${
+                        fields.platform === p.value ? "bg-label font-medium text-card" : "bg-background text-label"
+                      }`}
+                    >
+                      {p.label}
+                    </button>
+                  ))}
+                </div>
+              </Field>
+            )}
             <Field label="订单号" optional>
               <input className={inputCls} value={fields.orderNo ?? ""} onChange={(e) => set("orderNo", e.target.value)} />
             </Field>

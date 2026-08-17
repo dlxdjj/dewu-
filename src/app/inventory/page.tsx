@@ -49,6 +49,7 @@ export default function InventoryPage({
   const [platformFilter, setPlatformFilter] = useState<PlatformFilter>("all");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
   const [query, setQuery] = useState("");
+  const [missingSizeOnly, setMissingSizeOnly] = useState(false);
   const [filterOpen, setFilterOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState("");
@@ -60,6 +61,7 @@ export default function InventoryPage({
   const [changingStatus, setChangingStatus] = useState(false);
   const [target, setTarget] = useState<UnitStatus>("arrived");
   const shared = useAppData();
+  const bulk = !dataSource && shared?.data?.preferences.workflow === "bulk";
 
   const resolveDb = useCallback((): DbAdapter => dataSource ?? getDb(), [dataSource]);
 
@@ -91,7 +93,7 @@ export default function InventoryPage({
       setLoading(false);
       setImageUrls(await loadProductImageUrls(
         db,
-        new Set(joined.map((unit) => unit.product_id)),
+        [...new Map(joined.map((unit) => [unit.product.id, unit.product])).values()],
       ));
     } catch (reason) {
       setLoadError(reason instanceof Error ? reason.message : "加载失败");
@@ -136,26 +138,30 @@ export default function InventoryPage({
       if (view === "active" && statusFilter !== "all" && unit.status !== statusFilter) {
         return false;
       }
-      if (platformFilter !== "all" && unit.batch.platform !== platformFilter) return false;
+      if (!bulk && platformFilter !== "all" && unit.batch.platform !== platformFilter) return false;
+      if (missingSizeOnly && unit.size.trim()) return false;
       if (!needle) return true;
-      return [
+      const searchable = [
         unit.product.name,
         unit.product.style_code,
         unit.size,
         unit.batch.order_no,
-        PLATFORM_LABELS[unit.batch.platform],
-      ].some((value) => value?.toLocaleLowerCase().includes(needle));
+      ];
+      if (!bulk) searchable.push(PLATFORM_LABELS[unit.batch.platform]);
+      return searchable.some((value) => value?.toLocaleLowerCase().includes(needle));
     });
-  }, [platformFilter, query, statusFilter, units, view]);
+  }, [bulk, missingSizeOnly, platformFilter, query, statusFilter, units, view]);
 
   const groups = buildGroups(visibleUnits);
   const availablePlatforms = PLATFORMS.filter((option) =>
-    units.some((unit) => unit.batch.platform === option.value),
+    !bulk && units.some((unit) => unit.batch.platform === option.value),
   );
   const chosen = units.filter((unit) => selected.has(unit.id));
   const canBatch = view === "active" || view === "settlement";
   const activeFilterCount =
-    Number(platformFilter !== "all") + Number(view === "active" && statusFilter !== "all");
+    Number(!bulk && platformFilter !== "all") +
+    Number(view === "active" && statusFilter !== "all") +
+    Number(missingSizeOnly);
 
   function resetSelection(): void {
     setSelecting(false);
@@ -260,8 +266,14 @@ export default function InventoryPage({
       {activeFilterCount > 0 && (
         <div className="mb-3 flex flex-wrap gap-2 text-sm">
           {platformFilter !== "all" && (
+            !bulk &&
             <button onClick={() => setPlatformFilter("all")} className="rounded-full bg-tint/10 px-3 py-1.5 text-tint">
               {PLATFORM_LABELS[platformFilter]} ×
+            </button>
+          )}
+          {missingSizeOnly && (
+            <button onClick={() => setMissingSizeOnly(false)} className="rounded-full bg-tint/10 px-3 py-1.5 text-tint">
+              待补尺码 ×
             </button>
           )}
           {view === "active" && statusFilter !== "all" && (
@@ -300,6 +312,7 @@ export default function InventoryPage({
                   ? statusFilter === "all" ? "active" : statusFilter
                   : VIEWS.find((item) => item.value === view)?.status
               }
+              showPlatform={!bulk}
             />
           ))}
         </div>
@@ -345,11 +358,20 @@ export default function InventoryPage({
 
       <Sheet open={filterOpen} title="筛选库存" onClose={() => setFilterOpen(false)}>
         <div className="space-y-4">
+          {!bulk && (
+            <fieldset>
+              <legend className="text-sm text-muted">采购平台</legend>
+              <div className="mt-2 grid grid-cols-3 gap-2">
+                <FilterButton active={platformFilter === "all"} onClick={() => setPlatformFilter("all")}>全部</FilterButton>
+                {availablePlatforms.map((option) => <FilterButton key={option.value} active={platformFilter === option.value} onClick={() => setPlatformFilter(option.value)}>{option.label}</FilterButton>)}
+              </div>
+            </fieldset>
+          )}
           <fieldset>
-            <legend className="text-sm text-muted">采购平台</legend>
-            <div className="mt-2 grid grid-cols-3 gap-2">
-              <FilterButton active={platformFilter === "all"} onClick={() => setPlatformFilter("all")}>全部</FilterButton>
-              {availablePlatforms.map((option) => <FilterButton key={option.value} active={platformFilter === option.value} onClick={() => setPlatformFilter(option.value)}>{option.label}</FilterButton>)}
+            <legend className="text-sm text-muted">尺码资料</legend>
+            <div className="mt-2 grid grid-cols-2 gap-2">
+              <FilterButton active={!missingSizeOnly} onClick={() => setMissingSizeOnly(false)}>全部尺码</FilterButton>
+              <FilterButton active={missingSizeOnly} onClick={() => setMissingSizeOnly(true)}>待补尺码</FilterButton>
             </div>
           </fieldset>
           {view === "active" && (

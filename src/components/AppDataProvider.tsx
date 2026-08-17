@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { getDb } from "@/lib/data";
 import { toAppPathname } from "@/lib/base-path";
 import type {
+  AccountPreferences,
   InventoryUnit,
   MonthlyRebate,
   Product,
@@ -15,6 +16,7 @@ import type {
 } from "@/lib/types/database";
 
 export interface AppDataSnapshot {
+  preferences: AccountPreferences;
   units: InventoryUnit[];
   products: Product[];
   batches: PurchaseBatch[];
@@ -45,11 +47,12 @@ export default function AppDataProvider({ children }: { children: React.ReactNod
     setLoading(true);
     try {
       const db = getDb();
-      const [units, products, batches, sales, rebates, shippingEvents, shippingEventItems] = await Promise.all([
+      const [preferences, units, products, batches, sales, rebates, shippingEvents, shippingEventItems] = await Promise.all([
+        db.getAccountPreferences(),
         db.listUnits(), db.listProducts(), db.listBatches(), db.listSales(),
         db.listRebates(), db.listShippingEvents(), db.listShippingEventItems(),
       ]);
-      setData({ units, products, batches, sales, rebates, shippingEvents, shippingEventItems });
+      setData({ preferences, units, products, batches, sales, rebates, shippingEvents, shippingEventItems });
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "加载失败");
     } finally {

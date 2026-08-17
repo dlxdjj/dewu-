@@ -4,6 +4,7 @@ import BottomNav from "@/components/layout/BottomNav";
 import DataSourceGate from "@/components/ui/DataSourceGate";
 import PwaBootstrap from "@/components/PwaBootstrap";
 import AppDataProvider from "@/components/AppDataProvider";
+import ThemeBootstrap from "@/components/ThemeBootstrap";
 
 export const metadata: Metadata = {
   title: "进销存",
@@ -29,8 +30,9 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="zh-CN">
+    <html lang="zh-CN" data-theme="cirrus" suppressHydrationWarning>
       <body className="min-h-dvh">
+        <ThemeBootstrap />
         <DataSourceGate>
           <PwaBootstrap />
           <AppDataProvider>

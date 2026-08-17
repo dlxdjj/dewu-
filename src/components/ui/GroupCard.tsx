@@ -21,6 +21,7 @@ export default function GroupCard({
   onToggle,
   onSettle,
   statusScope,
+  showPlatform = true,
 }: {
   group: UnitGroup;
   imageUrl: string | null;
@@ -30,6 +31,7 @@ export default function GroupCard({
   onToggle: () => void;
   onSettle?: (units: UnitGroup["units"]) => void;
   statusScope?: GroupSelection["scope"];
+  showPlatform?: boolean;
 }) {
   const statuses = UNIT_STATUSES.flatMap((status) => {
     const count = group.statusCounts[status] ?? 0;
@@ -67,9 +69,11 @@ export default function GroupCard({
           </span>
         </div>
         <p className="mt-0.5 truncate text-sm leading-5 text-muted">
-          {group.styleCode || "历史无货号"} · {group.size}
+          {group.styleCode || "历史无货号"} · {group.size || "待补尺码"}
         </p>
-        <p className="mt-0.5 text-sm leading-5 text-muted">{platformText}</p>
+        {showPlatform && (
+          <p className="mt-0.5 text-sm leading-5 text-muted">{platformText}</p>
+        )}
         <div className="mt-2 flex min-w-0 flex-wrap items-center gap-2">
           <div className="flex min-w-0 flex-wrap gap-1.5" aria-label="库存状态">
             {statuses.map(({ count, status }) => {
@@ -101,7 +105,7 @@ export default function GroupCard({
     return (
       <button
         type="button"
-        aria-label={`选择 ${group.styleCode || group.product.name} ${group.size}，共 ${group.units.length} 件`}
+        aria-label={`选择 ${group.styleCode || group.product.name} ${group.size || "待补尺码"}，共 ${group.units.length} 件`}
         aria-pressed={selected}
         onClick={onToggle}
         className={className}

@@ -39,7 +39,7 @@ function attachment(overrides: Partial<Attachment> = {}): Attachment {
 
 describe("catalog", () => {
   it("normalizes and finds style codes without case or edge spaces", () => {
-    expect(normalizeStyleCode("  Ab-01 ")).toBe("ab-01");
+    expect(normalizeStyleCode("  Ab-01 ")).toBe("AB-01");
     expect(
       findProductByStyleCode([product()], " ab-01 ")?.id,
     ).toBe("p1");
@@ -78,9 +78,14 @@ describe("catalog", () => {
             ? Promise.resolve("https://signed.example/ok")
             : Promise.reject(new Error("sign failed")),
         ),
+      listCatalogProducts: vi.fn().mockResolvedValue([]),
+      catalogImageUrl: vi.fn(),
     };
 
-    await expect(loadProductImageUrls(db, ["p1", "p2"])).resolves.toEqual(
+    await expect(loadProductImageUrls(db, [
+      product({ id: "p1" }),
+      product({ id: "p2" }),
+    ])).resolves.toEqual(
       new Map([["p1", "https://signed.example/ok"]]),
     );
     expect(db.listAttachments).toHaveBeenCalledWith("product");

@@ -6,7 +6,7 @@ import {
 import type { DbAdapter, PurchaseResult } from "@/lib/data/types";
 import { parseYuanToCents } from "@/lib/utils/money";
 
-export interface PurchaseFormInput { productName: string; styleCode: string; platform: Platform; unitPriceYuan: string; quantity: number; purchasedAt: string; size: string; initialStatus: UnitStatus; orderNo?: string; note?: string; }
+export interface PurchaseFormInput { productName: string; styleCode: string; platform: Platform; unitPriceYuan: string; quantity: number; purchasedAt: string; size: string; initialStatus: UnitStatus; orderNo?: string; note?: string; allowMissingSize?: boolean; }
 
 export async function createPurchase(db: DbAdapter, input: PurchaseFormInput): Promise<PurchaseResult> {
   const productName = input.productName.trim();
@@ -14,7 +14,7 @@ export async function createPurchase(db: DbAdapter, input: PurchaseFormInput): P
   const styleCode = input.styleCode.trim();
   if (!styleCode) throw new Error("请填写货号");
   if (!Number.isSafeInteger(input.quantity) || input.quantity < 1 || input.quantity > 999) throw new Error("数量需为 1 至 999 的整数");
-  if (!input.size.trim()) throw new Error("请填写尺码");
+  if (!input.allowMissingSize && !input.size.trim()) throw new Error("请填写尺码");
   if (!/^\d{4}-\d{2}-\d{2}$/.test(input.purchasedAt)) throw new Error("采购日期格式不正确");
   if (!PURCHASE_INITIAL_STATUSES.includes(input.initialStatus as (typeof PURCHASE_INITIAL_STATUSES)[number])) {
     throw new Error("新增采购不能直接设为寄出、已售、已结算或退款，请保存后使用对应操作");

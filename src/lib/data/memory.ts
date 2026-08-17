@@ -4,6 +4,8 @@ import type {
   ClearResult,
   DbAdapter,
   DeleteResult,
+  ImportPurchasesInput,
+  ImportPurchasesResult,
   PurchaseInput,
   PurchaseResult,
   SaveMonthlyRebatesInput,
@@ -14,7 +16,9 @@ import type {
 } from "@/lib/data/types";
 import { allocateShippingCents } from "@/lib/services/shipping";
 import type {
+  AccountPreferences,
   Attachment,
+  CatalogProduct,
   InventoryUnit,
   MonthlyRebate,
   Product,
@@ -26,6 +30,7 @@ import type {
   StorageDeletionJob,
 } from "@/lib/types/database";
 import { assertCents } from "@/lib/utils/money";
+import { normalizeStyleCode } from "@/lib/catalog";
 
 export interface MemoryState {
   products: Product[];
@@ -38,6 +43,9 @@ export interface MemoryState {
   history: StatusHistory[];
   attachments: Attachment[];
   cleanupJobs: StorageDeletionJob[];
+  preferences: AccountPreferences;
+  catalogProducts: CatalogProduct[];
+  importHashes: string[];
 }
 
 const clone = <T,>(value: T): T => structuredClone(value);
@@ -61,6 +69,13 @@ export class MemoryDbAdapter implements DbAdapter {
       history: seed.history ?? [],
       attachments: seed.attachments ?? [],
       cleanupJobs: seed.cleanupJobs ?? [],
+      preferences: seed.preferences ?? {
+        user_id: "test-user",
+        workflow: "standard",
+        updated_at: now(),
+      },
+      catalogProducts: seed.catalogProducts ?? [],
+      importHashes: seed.importHashes ?? [],
     });
   }
 
@@ -111,6 +126,14 @@ export class MemoryDbAdapter implements DbAdapter {
     return clone(this.state.rebates);
   }
 
+  async getAccountPreferences() {
+    return clone(this.state.preferences);
+  }
+
+  async listCatalogProducts() {
+    return clone(this.state.catalogProducts);
+  }
+
   async listShippingEvents() {
     return clone(this.state.shippingEvents);
   }
@@ -143,6 +166,11 @@ export class MemoryDbAdapter implements DbAdapter {
     return `memory://${attachment.path}`;
   }
 
+  async catalogImageUrl(catalogProduct: CatalogProduct) {
+    if (!catalogProduct.image_path) throw new Error("该商品资料没有图片");
+    return `memory://${catalogProduct.image_path}`;
+  }
+
   async saveAttachment(input: SaveAttachmentInput) {
     const row: Attachment = {
       id: id(),
@@ -155,6 +183,39 @@ export class MemoryDbAdapter implements DbAdapter {
       created_at: now(),
     };
     this.state.attachments.push(row);
+    if (
+      this.state.preferences.workflow === "standard" &&
+      input.owner_type === "product" &&
+      input.kind === "product_image"
+    ) {
+      const product = this.state.products.find((item) => item.id === input.owner_id);
+      if (product?.style_code) {
+        const normalized = normalizeStyleCode(product.style_code);
+        let catalog = this.state.catalogProducts.find(
+          (item) => item.normalized_style_code === normalized,
+        );
+        if (!catalog) {
+          catalog = {
+            id: id(),
+            normalized_style_code: normalized,
+            display_style_code: product.style_code,
+            canonical_name: product.name,
+            image_path: row.path,
+            source_user_id: "test-user",
+            verified_at: now(),
+            created_at: now(),
+            updated_at: now(),
+          };
+          this.state.catalogProducts.push(catalog);
+        } else {
+          catalog.canonical_name = product.name;
+          catalog.display_style_code = product.style_code;
+          catalog.image_path = row.path;
+          catalog.updated_at = now();
+        }
+        product.catalog_product_id = catalog.id;
+      }
+    }
     return clone(row);
   }
 
@@ -178,22 +239,42 @@ export class MemoryDbAdapter implements DbAdapter {
       ) {
         throw new Error("新增采购不能直接进入寄出、销售、结算或退款状态");
       }
+      if (this.state.preferences.workflow === "standard" && !input.size.trim()) {
+        throw new Error("请填写尺码");
+      }
 
       const timestamp = now();
+      const normalized = normalizeStyleCode(styleCode);
+      const catalog = draft.catalogProducts.find(
+        (row) => row.normalized_style_code === normalized,
+      );
       let product = draft.products.find(
-        (row) => row.style_code?.toLowerCase() === styleCode.toLowerCase(),
+        (row) => normalizeStyleCode(row.style_code) === normalized,
       );
       if (!product) {
         product = {
           id: id(),
           user_id: "test-user",
-          name: input.productName,
-          style_code: styleCode,
+          name:
+            draft.preferences.workflow === "bulk" && catalog
+              ? catalog.canonical_name
+              : input.productName,
+          style_code:
+            draft.preferences.workflow === "bulk" && catalog
+              ? catalog.display_style_code
+              : styleCode,
           brand: null,
+          catalog_product_id: catalog?.id ?? null,
           created_at: timestamp,
           updated_at: timestamp,
         };
         draft.products.push(product);
+        mutate();
+      } else if (draft.preferences.workflow === "bulk" && catalog) {
+        product.name = catalog.canonical_name;
+        product.style_code = catalog.display_style_code;
+        product.catalog_product_id = catalog.id;
+        product.updated_at = timestamp;
         mutate();
       }
 
@@ -201,7 +282,7 @@ export class MemoryDbAdapter implements DbAdapter {
         id: id(),
         user_id: "test-user",
         product_id: product.id,
-        platform: input.platform,
+        platform: draft.preferences.workflow === "bulk" ? "other" : input.platform,
         order_no: input.orderNo || null,
         unit_price_cents: input.unitPriceCents,
         quantity: input.quantity,
@@ -243,7 +324,137 @@ export class MemoryDbAdapter implements DbAdapter {
         unitIds.push(unit.id);
         mutate();
       }
+      if (draft.preferences.workflow === "standard") {
+        let shared = draft.catalogProducts.find(
+          (row) => row.normalized_style_code === normalized,
+        );
+        if (!shared) {
+          shared = {
+            id: id(),
+            normalized_style_code: normalized,
+            display_style_code: product.style_code ?? styleCode,
+            canonical_name: product.name,
+            image_path: null,
+            source_user_id: "test-user",
+            verified_at: timestamp,
+            created_at: timestamp,
+            updated_at: timestamp,
+          };
+          draft.catalogProducts.push(shared);
+        } else {
+          shared.canonical_name = product.name;
+          shared.display_style_code = product.style_code ?? styleCode;
+          shared.updated_at = timestamp;
+        }
+        product.catalog_product_id = shared.id;
+      }
       return { productId: product.id, batchId: batch.id, unitIds };
+    });
+  }
+
+  async importPurchases(input: ImportPurchasesInput): Promise<ImportPurchasesResult> {
+    if (this.state.preferences.workflow !== "bulk") {
+      throw new Error("当前账号未开启表格导入");
+    }
+    return this.transaction((draft, mutate) => {
+      if (draft.importHashes.includes(input.fileHash)) {
+        throw new Error("这份表格已经导入过");
+      }
+      if (!input.rows.length || input.rows.length > 1000) {
+        throw new Error("表格行数不正确");
+      }
+      const timestamp = now();
+      let unitCount = 0;
+      let totalCostCents = 0;
+      let matchedRows = 0;
+      for (const row of input.rows) {
+        assertCents(row.unitPriceCents);
+        if (!row.productName.trim() || !row.styleCode.trim()) {
+          throw new Error(`第 ${row.rowNumber} 行缺少货号或货品名称`);
+        }
+        if (!Number.isSafeInteger(row.quantity) || row.quantity < 1 || row.quantity > 999) {
+          throw new Error(`第 ${row.rowNumber} 行数量不正确`);
+        }
+        unitCount += row.quantity;
+        if (unitCount > 5000) throw new Error("单次最多导入 5000 件");
+        const normalized = normalizeStyleCode(row.styleCode);
+        const catalog = draft.catalogProducts.find(
+          (item) => item.normalized_style_code === normalized,
+        );
+        if (catalog) matchedRows += 1;
+        let product = draft.products.find(
+          (item) => normalizeStyleCode(item.style_code) === normalized,
+        );
+        if (!product) {
+          product = {
+            id: id(), user_id: "test-user", brand: null,
+            name: catalog?.canonical_name ?? row.productName.trim(),
+            style_code: catalog?.display_style_code ?? row.styleCode.trim(),
+            catalog_product_id: catalog?.id ?? null,
+            created_at: timestamp, updated_at: timestamp,
+          };
+          draft.products.push(product);
+          mutate();
+        } else if (catalog) {
+          product.name = catalog.canonical_name;
+          product.style_code = catalog.display_style_code;
+          product.catalog_product_id = catalog.id;
+          product.updated_at = timestamp;
+          mutate();
+        }
+        const batch: PurchaseBatch = {
+          id: id(), user_id: "test-user", product_id: product.id,
+          platform: "other", order_no: null,
+          unit_price_cents: row.unitPriceCents, quantity: row.quantity,
+          shipping_fee_cents: 0, discount_amount_cents: 0,
+          purchased_at: input.purchasedAt, note: "表格导入",
+          created_at: timestamp, updated_at: timestamp,
+        };
+        draft.batches.push(batch);
+        mutate();
+        for (let index = 0; index < row.quantity; index += 1) {
+          const unitId = id();
+          draft.units.push({
+            id: unitId, user_id: "test-user", batch_id: batch.id,
+            product_id: product.id, size: row.size.trim(),
+            unit_cost_cents: row.unitPriceCents, listing_price_cents: null,
+            outbound_shipping_cents: 0, status: "arrived",
+            created_at: timestamp, updated_at: timestamp,
+          });
+          draft.history.push({
+            id: id(), user_id: "test-user", unit_id: unitId,
+            from_status: null, to_status: "arrived", note: "表格导入",
+            created_at: timestamp,
+          });
+          mutate();
+        }
+        totalCostCents += row.unitPriceCents * row.quantity;
+      }
+      draft.importHashes.push(input.fileHash);
+      mutate();
+      return {
+        importId: id(), rowCount: input.rows.length, unitCount,
+        totalCostCents, matchedRows,
+        unmatchedRows: input.rows.length - matchedRows,
+      };
+    });
+  }
+
+  async assignUnitSizes(assignments: { unitId: string; size: string }[]) {
+    return this.transaction((draft, mutate) => {
+      if (!assignments.length || new Set(assignments.map((item) => item.unitId)).size !== assignments.length) {
+        throw new Error("尺码分配无效或重复");
+      }
+      for (const assignment of assignments) {
+        const size = assignment.size.trim();
+        if (!size || size.length > 40) throw new Error("请填写正确的尺码");
+        const unit = draft.units.find((row) => row.id === assignment.unitId);
+        if (!unit) throw new Error("库存不存在");
+        unit.size = size;
+        unit.updated_at = now();
+        mutate();
+      }
+      return assignments.length;
     });
   }
 

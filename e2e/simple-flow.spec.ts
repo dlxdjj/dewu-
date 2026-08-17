@@ -1,5 +1,21 @@
 import { expect, test, type Page } from "@playwright/test";
 
+function contrastRatio(foreground: string, background: string): number {
+  const luminance = (css: string) => {
+    const channels = (css.match(/[\d.]+/g) ?? []).slice(0, 3).map(Number);
+    const linear = channels.map((value) => {
+      const channel = value / 255;
+      return channel <= 0.04045
+        ? channel / 12.92
+        : ((channel + 0.055) / 1.055) ** 2.4;
+    });
+    return 0.2126 * linear[0] + 0.7152 * linear[1] + 0.0722 * linear[2];
+  };
+  const first = luminance(foreground);
+  const second = luminance(background);
+  return (Math.max(first, second) + 0.05) / (Math.min(first, second) + 0.05);
+}
+
 async function installAuthenticatedSession(page: Page): Promise<void> {
   await page.addInitScript(() => {
     const session = JSON.stringify({
@@ -53,10 +69,71 @@ test("390px no-session page does not overflow", async ({ page }) => {
   expect(width.scroll).toBeLessThanOrEqual(width.client);
 });
 
+test("390px settings switches and preserves all four visual themes", async ({
+  page,
+}) => {
+  await installAuthenticatedSession(page);
+  await page.route("**/rest/v1/**", (route) => {
+    if (route.request().url().includes("/rpc/get_my_account_preferences")) {
+      return route.fulfill({
+        json: {
+          user_id: "test-user",
+          workflow: "standard",
+          updated_at: "2026-08-17T00:00:00Z",
+        },
+      });
+    }
+    return route.fulfill({ json: [] });
+  });
+
+  await page.goto("/settings/");
+  for (const [label, value] of [
+    ["像素工坊", "spritecraft"],
+    ["伏特夜航", "voltura"],
+    ["流明边界", "lumen"],
+    ["云海", "cirrus"],
+  ] as const) {
+    await page.getByRole("button", { name: new RegExp(label) }).click();
+    await expect(page.locator("html")).toHaveAttribute("data-theme", value);
+    const width = await page.evaluate(() => ({
+      client: document.documentElement.clientWidth,
+      scroll: document.documentElement.scrollWidth,
+    }));
+    expect(width.scroll).toBeLessThanOrEqual(width.client);
+
+    await page.goto("/");
+    const profitLabel = page.locator("p").filter({ hasText: /^\d+月利润$/ }).first();
+    await expect(profitLabel).toBeVisible();
+    const profitCard = profitLabel.locator("..");
+    const colors = await profitCard.evaluate((card) => ({
+      background: getComputedStyle(card).backgroundColor,
+      amount: getComputedStyle(card.querySelectorAll("p")[1]).color,
+    }));
+    expect(contrastRatio(colors.amount, colors.background)).toBeGreaterThanOrEqual(4.5);
+    await page.goto("/settings/");
+  }
+
+  await page.getByRole("button", { name: /伏特夜航/ }).click();
+  await page.reload();
+  await expect(page.locator("html")).toHaveAttribute("data-theme", "voltura");
+});
+
 test("390px add form keeps the purchase date inside the viewport", async ({
   page,
 }) => {
   await installAuthenticatedSession(page);
+  await page.route("**/rest/v1/**", (route) => {
+    if (route.request().url().includes("/rpc/get_my_account_preferences")) {
+      return route.fulfill({
+        json: {
+          user_id: "test-user",
+          workflow: "standard",
+          updated_at: "2026-08-17T00:00:00Z",
+        },
+      });
+    }
+    return route.fulfill({ json: [] });
+  });
 
   await page.goto("/add/");
   const date = page.getByLabel("采购日期");

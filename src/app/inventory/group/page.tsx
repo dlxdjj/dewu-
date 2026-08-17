@@ -5,6 +5,8 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import Card from "@/components/ui/Card";
 import SaleFormSheet from "@/components/ui/SaleFormSheet";
+import SizeAssignmentSheet from "@/components/ui/SizeAssignmentSheet";
+import { useAppData } from "@/components/AppDataProvider";
 import {
   PLATFORM_LABELS,
   PLATFORMS,
@@ -74,6 +76,9 @@ function GroupContent({
     null,
   );
   const [refresh, setRefresh] = useState(0);
+  const [assigningSize, setAssigningSize] = useState(false);
+  const shared = useAppData();
+  const showPlatform = Boolean(dataSource) || shared?.data?.preferences.workflow === "standard";
   const resolveDb = useCallback(
     (): DbAdapter => dataSource ?? getDb(),
     [dataSource],
@@ -138,6 +143,7 @@ function GroupContent({
     0,
   );
   const awaitingSettlement = units.filter((unit) => unit.status === "sold");
+  const missingSizeUnits = units.filter((unit) => !unit.size.trim());
 
   async function settlementDone(): Promise<void> {
     setSettlementUnits(null);
@@ -153,7 +159,7 @@ function GroupContent({
         {units[0]?.product.name ?? "合并库存"}
       </h1>
       <p className="mt-1 text-sm text-muted">
-        {styleCode || "历史无货号"} · {size}
+        {styleCode || "历史无货号"} · {size || "待补尺码"}
       </p>
       <Card className="mt-3">
         <p>{loading ? "数量 …" : `数量 ${units.length} 件`}</p>
@@ -169,12 +175,21 @@ function GroupContent({
             批量录到手价 · {awaitingSettlement.length} 件待结算
           </button>
         )}
+        {missingSizeUnits.length > 0 && (
+          <button
+            type="button"
+            onClick={() => setAssigningSize(true)}
+            className="mt-3 min-h-11 w-full rounded-xl bg-tint px-3 text-[15px] font-medium"
+          >
+            补充尺码 · {missingSizeUnits.length} 件
+          </button>
+        )}
       </Card>
       <div className="mt-3 space-y-2">
         {units.map((unit, index) => (
           <div key={unit.id} className="rounded-xl bg-card p-3">
             <p className="text-[15px] leading-6">
-              第 {index + 1} 件 · {PLATFORM_LABELS[unit.batch.platform]} · 进价{" "}
+              第 {index + 1} 件{showPlatform ? ` · ${PLATFORM_LABELS[unit.batch.platform]}` : ""} · 进价{" "}
               {formatCents(unit.unit_cost_cents)}
             </p>
             <p className="mt-0.5 text-sm leading-5 text-muted">
@@ -235,6 +250,21 @@ function GroupContent({
           dataSource={dataSource}
           onClose={() => setSettlementUnits(null)}
           onDone={settlementDone}
+        />
+      )}
+      {assigningSize && (
+        <SizeAssignmentSheet
+          units={missingSizeUnits}
+          onClose={() => setAssigningSize(false)}
+          onConfirm={async (assignments) => {
+            await resolveDb().assignUnitSizes(assignments);
+            setAssigningSize(false);
+            const sizeMap = new Map(assignments.map((item) => [item.unitId, item.size]));
+            setUnits((old) => old.map((unit) =>
+              sizeMap.has(unit.id) ? { ...unit, size: sizeMap.get(unit.id)! } : unit,
+            ));
+            await shared?.refresh();
+          }}
         />
       )}
     </>

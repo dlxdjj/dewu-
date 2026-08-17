@@ -1,6 +1,6 @@
 import type { Platform } from "@/lib/constants/platform";
 import type { UnitStatus } from "@/lib/constants/status";
-import type { Attachment, AttachmentKind, AttachmentOwner, InventoryUnit, MonthlyRebate, Product, PurchaseBatch, Sale, ShippingEvent, ShippingEventItem, StatusHistory } from "@/lib/types/database";
+import type { AccountPreferences, Attachment, AttachmentKind, AttachmentOwner, CatalogProduct, InventoryUnit, MonthlyRebate, Product, PurchaseBatch, Sale, ShippingEvent, ShippingEventItem, StatusHistory } from "@/lib/types/database";
 
 export interface ShippingAllocation { unitId: string; shippingCents: number; }
 export interface ShipUnitsInput {
@@ -24,17 +24,44 @@ export interface PurchaseInput {
 }
 export interface PurchaseResult { productId: string; batchId: string; unitIds: string[]; }
 export interface SaveAttachmentInput { file: Blob; owner_type: AttachmentOwner; owner_id: string; kind: AttachmentKind; }
+export interface SpreadsheetImportRow {
+  rowNumber: number;
+  styleCode: string;
+  productName: string;
+  quantity: number;
+  unitPriceCents: number;
+  size: string;
+}
+export interface ImportPurchasesInput {
+  rows: SpreadsheetImportRow[];
+  fileHash: string;
+  purchasedAt: string;
+}
+export interface ImportPurchasesResult {
+  importId: string;
+  rowCount: number;
+  unitCount: number;
+  totalCostCents: number;
+  matchedRows: number;
+  unmatchedRows: number;
+}
+export interface UnitSizeAssignment { unitId: string; size: string; }
 
 export interface DbAdapter {
   readonly kind: "supabase" | "memory";
   listProducts(): Promise<Product[]>; listBatches(): Promise<PurchaseBatch[]>; listUnits(): Promise<InventoryUnit[]>;
   listSales(): Promise<Sale[]>; listHistory(unitId?: string): Promise<StatusHistory[]>;
   listRebates(): Promise<MonthlyRebate[]>;
+  getAccountPreferences(): Promise<AccountPreferences>;
+  listCatalogProducts(): Promise<CatalogProduct[]>;
   listShippingEvents(): Promise<ShippingEvent[]>;
   listShippingEventItems(): Promise<ShippingEventItem[]>;
   listAttachments(ownerType: AttachmentOwner, ownerId?: string): Promise<Attachment[]>;
   attachmentUrl(attachment: Attachment): Promise<string>; saveAttachment(input: SaveAttachmentInput): Promise<Attachment>;
+  catalogImageUrl(catalogProduct: CatalogProduct): Promise<string>;
   createPurchase(input: PurchaseInput): Promise<PurchaseResult>;
+  importPurchases(input: ImportPurchasesInput): Promise<ImportPurchasesResult>;
+  assignUnitSizes(assignments: UnitSizeAssignment[]): Promise<number>;
   shipUnits(input: ShipUnitsInput): Promise<ShipUnitsResult>;
   settleUnits(input: SettleUnitsInput): Promise<void>;
   changeStatus(input: StatusChangeInput): Promise<void>;

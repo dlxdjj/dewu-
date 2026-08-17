@@ -4,7 +4,7 @@ import type { RebateSource } from "@/lib/constants/rebate";
 
 interface OwnedRow { id: string; user_id: string; created_at: string; }
 
-export interface Product extends OwnedRow { name: string; style_code: string | null; brand: string | null; updated_at: string; }
+export interface Product extends OwnedRow { name: string; style_code: string | null; brand: string | null; catalog_product_id?: string | null; updated_at: string; }
 export interface PurchaseBatch extends OwnedRow {
   product_id: string; platform: Platform; order_no: string | null; unit_price_cents: number;
   quantity: number; shipping_fee_cents: number; discount_amount_cents: number;
@@ -45,4 +45,21 @@ export type AttachmentKind = "product_image" | "order_screenshot";
 export interface Attachment extends OwnedRow { owner_type: AttachmentOwner; owner_id: string; kind: AttachmentKind; path: string; content_type: string | null; }
 export interface StatusHistory extends OwnedRow { id: string; unit_id: string; from_status: UnitStatus | null; to_status: UnitStatus; note: string | null; }
 export interface StorageDeletionJob extends OwnedRow { path: string; completed_at: string | null; }
+export type AccountWorkflow = "standard" | "bulk";
+export interface AccountPreferences {
+  user_id: string;
+  workflow: AccountWorkflow;
+  updated_at: string;
+}
+export interface CatalogProduct {
+  id: string;
+  normalized_style_code: string;
+  display_style_code: string;
+  canonical_name: string;
+  image_path: string | null;
+  source_user_id: string | null;
+  verified_at: string;
+  created_at: string;
+  updated_at: string;
+}
 export interface UnitJoined extends InventoryUnit { product: Product; batch: PurchaseBatch; sale: Sale | null; }

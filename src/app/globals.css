@@ -35,10 +35,120 @@
     0 1px 1px rgba(14, 17, 22, 0.04),
     0 20px 40px -24px rgba(14, 17, 22, 0.22),
     0 2px 6px rgba(14, 17, 22, 0.06);
+  --app-status-background: #b8d4f1;
+  --app-body-background: #edf2f7;
+  --app-background-image:
+    radial-gradient(62% 38% at 18% 78%, rgba(255, 255, 255, 0.95) 0%, rgba(255, 255, 255, 0) 62%),
+    radial-gradient(52% 34% at 82% 70%, rgba(255, 255, 255, 0.9) 0%, rgba(255, 255, 255, 0) 60%),
+    radial-gradient(48% 30% at 50% 18%, rgba(255, 255, 255, 0.75) 0%, rgba(255, 255, 255, 0) 60%),
+    linear-gradient(180deg, #b8d4f1 0%, #edf2f7 78%);
+  --app-card-radius: 28px;
+  --app-control-radius: 999px;
+  --app-card-shadow: var(--cirrus-shadow-1);
+  --app-raised-shadow: var(--cirrus-shadow-2);
+  --app-cta-bg: #0e1116;
+  --app-cta-fg: #ffffff;
+  --app-focus: rgba(46, 125, 239, 0.28);
+}
+
+html[data-theme="spritecraft"] {
+  --color-background: #ead8a3;
+  --color-card: #fbf5dd;
+  --color-label: #1c1c1c;
+  --color-muted: #6d5526;
+  --color-tint: #156c00;
+  --color-danger: #a53a28;
+  --color-separator: #b89246;
+  --cirrus-cloud: #fbf5dd;
+  --cirrus-ink: #1c1c1c;
+  --cirrus-mist: #6d5526;
+  --cirrus-mist-soft: #927842;
+  --cirrus-edge: #b89246;
+  --cirrus-sunken: #ead8a3;
+  --cirrus-signal: #156c00;
+  --cirrus-shadow-1: 3px 3px 0 #6d5526;
+  --cirrus-shadow-2: 5px 5px 0 #1c1c1c;
+  --app-status-background: #f4e9c8;
+  --app-body-background: #f4e9c8;
+  --app-background-image:
+    linear-gradient(rgba(109, 85, 38, 0.08) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(109, 85, 38, 0.08) 1px, transparent 1px),
+    linear-gradient(180deg, #f4e9c8, #ead8a3);
+  --app-card-radius: 10px;
+  --app-control-radius: 8px;
+  --app-card-shadow: var(--cirrus-shadow-1);
+  --app-raised-shadow: var(--cirrus-shadow-2);
+  --app-cta-bg: #156c00;
+  --app-cta-fg: #ffffff;
+  --app-focus: rgba(47, 168, 79, 0.32);
+}
+
+html[data-theme="voltura"] {
+  color-scheme: dark;
+  --color-background: #10141a;
+  --color-card: #1d2123;
+  --color-label: #ecefe8;
+  --color-muted: #9aa298;
+  --color-tint: #d3f23f;
+  --color-danger: #ec6a5e;
+  --color-separator: #323839;
+  --cirrus-cloud: #1d2123;
+  --cirrus-ink: #ecefe8;
+  --cirrus-mist: #9aa298;
+  --cirrus-mist-soft: #7a8278;
+  --cirrus-edge: #323839;
+  --cirrus-sunken: #10141a;
+  --cirrus-signal: #d3f23f;
+  --cirrus-shadow-1: 0 0 0 1px #262b2c;
+  --cirrus-shadow-2: 0 0 0 1px rgba(211, 242, 63, 0.28), 0 12px 40px -12px rgba(211, 242, 63, 0.32);
+  --app-status-background: #15191a;
+  --app-body-background: #15191a;
+  --app-background-image:
+    radial-gradient(circle at 85% 15%, rgba(211, 242, 63, 0.13), transparent 28%),
+    linear-gradient(180deg, #15191a, #10141a);
+  --app-card-radius: 22px;
+  --app-control-radius: 14px;
+  --app-card-shadow: var(--cirrus-shadow-1);
+  --app-raised-shadow: var(--cirrus-shadow-2);
+  --app-cta-bg: #d3f23f;
+  --app-cta-fg: #14181a;
+  --app-focus: rgba(211, 242, 63, 0.24);
+}
+
+html[data-theme="lumen"] {
+  color-scheme: dark;
+  --color-background: #0b151e;
+  --color-card: #20222a;
+  --color-label: #ffffff;
+  --color-muted: #a8aebb;
+  --color-tint: #cfd8e6;
+  --color-danger: #ff8a8a;
+  --color-separator: #2f3441;
+  --cirrus-cloud: #20222a;
+  --cirrus-ink: #ffffff;
+  --cirrus-mist: #a8aebb;
+  --cirrus-mist-soft: #777f8f;
+  --cirrus-edge: #2f3441;
+  --cirrus-sunken: #0b151e;
+  --cirrus-signal: #cfd8e6;
+  --cirrus-shadow-1: inset 0 0 0 1px rgba(255,255,255,.1), 0 12px 32px -12px rgba(0,0,0,.6);
+  --cirrus-shadow-2: inset 0 0 0 1px rgba(255,255,255,.16), 0 24px 48px -16px rgba(0,0,0,.7);
+  --app-status-background: #1b1c22;
+  --app-body-background: #1b1c22;
+  --app-background-image:
+    radial-gradient(ellipse at bottom, rgba(71, 81, 92, 0.45) 0%, rgba(11, 21, 30, 0.96) 55%),
+    linear-gradient(180deg, #1b1c22, #0b151e);
+  --app-card-radius: 14px;
+  --app-control-radius: 7px;
+  --app-card-shadow: var(--cirrus-shadow-1);
+  --app-raised-shadow: var(--cirrus-shadow-2);
+  --app-cta-bg: radial-gradient(ellipse at bottom, #47515c 0%, #0b151e 55%);
+  --app-cta-fg: #ffffff;
+  --app-focus: rgba(207, 216, 230, 0.25);
 }
 
 html {
-  background: var(--cirrus-horizon);
+  background: var(--app-status-background);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   -webkit-text-size-adjust: 100%;
@@ -50,7 +160,7 @@ body {
   position: relative;
   isolation: isolate;
   min-height: 100dvh;
-  background: var(--cirrus-horizon);
+  background: var(--app-body-background);
   color: var(--color-label);
   font-family: var(--font-sans);
   font-variant-numeric: tabular-nums;
@@ -62,23 +172,8 @@ body::before {
   z-index: -1;
   inset: 0;
   pointer-events: none;
-  background-image:
-    radial-gradient(
-      62% 38% at 18% 78%,
-      rgba(255, 255, 255, 0.95) 0%,
-      rgba(255, 255, 255, 0) 62%
-    ),
-    radial-gradient(
-      52% 34% at 82% 70%,
-      rgba(255, 255, 255, 0.9) 0%,
-      rgba(255, 255, 255, 0) 60%
-    ),
-    radial-gradient(
-      48% 30% at 50% 18%,
-      rgba(255, 255, 255, 0.75) 0%,
-      rgba(255, 255, 255, 0) 60%
-    ),
-    linear-gradient(180deg, var(--cirrus-horizon) 0%, var(--cirrus-sky) 78%);
+  background-image: var(--app-background-image);
+  background-size: 100% 100%;
 }
 
 .app-main {
@@ -94,7 +189,8 @@ h3 {
 
 /* Tailwind 的同一 tint token 同时用于按钮与链接；Cirrus 分开处理。 */
 .bg-tint {
-  background-color: var(--cirrus-ink) !important;
+  background: var(--app-cta-bg) !important;
+  color: var(--app-cta-fg) !important;
 }
 
 .text-tint {
@@ -111,17 +207,17 @@ h3 {
 
 .rounded-2xl.bg-card {
   border: 1px solid var(--cirrus-edge);
-  border-radius: 28px;
-  box-shadow: var(--cirrus-shadow-1);
+  border-radius: var(--app-card-radius);
+  box-shadow: var(--app-card-shadow);
 }
 
 /* 单行表单控件统一为 Cloud 胶囊，保留 16px 字号防止 iOS 自动放大。 */
 :where(input:not([type="file"]):not([type="checkbox"]):not([type="radio"]), select) {
   min-height: 2.75rem;
   border: 1px solid var(--cirrus-edge) !important;
-  border-radius: 999px !important;
+  border-radius: var(--app-control-radius) !important;
   background: var(--cirrus-cloud) !important;
-  box-shadow: var(--cirrus-shadow-1);
+  box-shadow: var(--app-card-shadow);
   color: var(--cirrus-ink);
   font-size: 1rem;
 }
@@ -140,17 +236,26 @@ textarea {
 :where(input, select, textarea):focus {
   border-color: var(--cirrus-signal) !important;
   outline: 0;
-  box-shadow: 0 0 0 3px rgba(46, 125, 239, 0.28) !important;
+  box-shadow: 0 0 0 3px var(--app-focus) !important;
 }
 
 button.rounded-xl,
 a.rounded-xl {
-  border-radius: 999px !important;
+  border-radius: var(--app-control-radius) !important;
 }
 
 button.rounded-2xl,
 a.rounded-2xl {
-  border-radius: 999px !important;
+  border-radius: var(--app-control-radius) !important;
+}
+
+html:not([data-theme="cirrus"]) :where(button.rounded-full, a.rounded-full, nav.rounded-full) {
+  border-radius: var(--app-control-radius) !important;
+}
+
+html[data-theme="voltura"] :where(input, select, textarea),
+html[data-theme="lumen"] :where(input, select, textarea) {
+  color: var(--color-label);
 }
 
 @media (min-width: 768px) {
@@ -187,9 +292,9 @@ a.rounded-2xl {
   max-inline-size: 100%;
   overflow: hidden;
   border: 1px solid var(--cirrus-edge);
-  border-radius: 999px;
+  border-radius: var(--app-control-radius);
   background: var(--cirrus-cloud);
-  box-shadow: var(--cirrus-shadow-1);
+  box-shadow: var(--app-card-shadow);
 }
 
 .mobile-date-input {
@@ -200,7 +305,7 @@ a.rounded-2xl {
   max-inline-size: 100%;
   min-block-size: 3rem;
   border: 0;
-  border-radius: 999px;
+  border-radius: var(--app-control-radius);
   background: var(--cirrus-cloud);
   padding: 0.75rem;
   color: var(--color-label);

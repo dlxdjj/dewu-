@@ -26,6 +26,7 @@
     "next": "16.3.0",
     "react": "19.2.8",
     "react-dom": "19.2.8",
+    "read-excel-file": "^9.2.0",
     "tesseract.js": "^7.0.0"
   },
   "devDependencies": {

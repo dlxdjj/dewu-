@@ -5,7 +5,11 @@ import { FormEvent, useCallback, useEffect, useState } from "react";
 import Card from "@/components/ui/Card";
 import ImagePicker from "@/components/ui/ImagePicker";
 import PageHeader from "@/components/ui/PageHeader";
-import { findProductByStyleCode, loadProductImageUrls } from "@/lib/catalog";
+import {
+  findProductByStyleCode,
+  loadProductImageUrls,
+  normalizeStyleCode,
+} from "@/lib/catalog";
 import { PLATFORMS, type Platform } from "@/lib/constants/platform";
 import {
   PURCHASE_INITIAL_STATUSES,
@@ -50,14 +54,21 @@ const initialForm = (): PurchaseFormState => ({
 export default function PurchaseForm({
   dataSource,
   onComplete,
+  showPlatform = true,
+  allowMissingSize = false,
+  showHeader = true,
 }: {
   dataSource?: DbAdapter;
   onComplete: () => void;
+  showPlatform?: boolean;
+  allowMissingSize?: boolean;
+  showHeader?: boolean;
 }) {
   const [form, setForm] = useState<PurchaseFormState>(initialForm);
   const [image, setImage] = useState<Blob | null>(null);
   const [existingImage, setExistingImage] = useState<string | null>(null);
   const [checkingImage, setCheckingImage] = useState(false);
+  const [catalogMessage, setCatalogMessage] = useState("");
   const [saving, setSaving] = useState(false);
   const [savedProductId, setSavedProductId] = useState<string | null>(null);
   const [error, setError] = useState("");
@@ -90,17 +101,47 @@ export default function PurchaseForm({
       setCheckingImage(true);
       try {
         const db = resolveDb();
-        const product = findProductByStyleCode(
-          await db.listProducts(),
-          styleCode,
-        );
+        const product = findProductByStyleCode(await db.listProducts(), styleCode);
         if (!active) return;
         if (!product) {
+          if (allowMissingSize) {
+            const catalog = (await db.listCatalogProducts()).find(
+              (item) => item.normalized_style_code === normalizeStyleCode(styleCode),
+            );
+            if (!active) return;
+            if (catalog) {
+              setForm((old) => ({ ...old, productName: catalog.canonical_name }));
+              let catalogImage: string | null = null;
+              if (catalog.image_path) {
+                catalogImage = await db.catalogImageUrl(catalog).catch(() => null);
+              }
+              if (!active) return;
+              setExistingImage(catalogImage);
+              setCatalogMessage(
+                catalogImage
+                  ? "已按货号匹配标准名称和商品图片"
+                  : "已按货号匹配标准名称，商品图片暂缺",
+              );
+              return;
+            }
+          }
           setExistingImage(null);
+          setCatalogMessage("");
           return;
         }
-        const urls = await loadProductImageUrls(db, [product.id]);
-        if (active) setExistingImage(urls.get(product.id) ?? null);
+        const urls = await loadProductImageUrls(db, [product]);
+        if (active) {
+          const url = urls.get(product.id) ?? null;
+          setExistingImage(url);
+          if (allowMissingSize) {
+            setForm((old) => ({ ...old, productName: product.name }));
+            setCatalogMessage(
+              url
+                ? "已按货号匹配已有名称和商品图片"
+                : "已按货号匹配已有名称，商品图片暂缺",
+            );
+          }
+        }
       } catch {
         if (active) setExistingImage(null);
       } finally {
@@ -112,7 +153,7 @@ export default function PurchaseForm({
       active = false;
       window.clearTimeout(timeoutId);
     };
-  }, [form.styleCode, resolveDb]);
+  }, [allowMissingSize, form.styleCode, resolveDb]);
 
   function set<K extends keyof PurchaseFormState>(
     key: K,
@@ -138,6 +179,8 @@ export default function PurchaseForm({
     try {
       const result = await createPurchase(resolveDb(), {
         ...form,
+        platform: showPlatform ? form.platform : "other",
+        allowMissingSize,
         unitPriceYuan: form.unitPrice,
         quantity: Number(form.quantity),
       });
@@ -178,7 +221,14 @@ export default function PurchaseForm({
 
   return (
     <div className="mx-auto w-full max-w-xl">
-      <PageHeader title="添加" subtitle="录入采购并保存商品图片" />
+      {showHeader && (
+        <PageHeader
+          title="添加"
+          subtitle={
+            allowMissingSize ? "录入商品，尺码可以稍后补充" : "录入采购并保存商品图片"
+          }
+        />
+      )}
       <Link
         href="/add/ocr"
         className="mb-4 block rounded-full bg-label py-3.5 text-center text-sm font-medium text-card shadow-[var(--cirrus-shadow-2)]"
@@ -209,14 +259,15 @@ export default function PurchaseForm({
                   set("styleCode", event.target.value);
                   setExistingImage(null);
                   setCheckingImage(false);
+                  setCatalogMessage("");
                 }}
               />
             </label>
             <label className="min-w-0 text-sm">
-              尺码（必填）
+              {allowMissingSize ? "尺码（可后补）" : "尺码（必填）"}
               <input
-                aria-label="尺码（必填）"
-                required
+                aria-label={allowMissingSize ? "尺码（可后补）" : "尺码（必填）"}
+                required={!allowMissingSize}
                 className={`${inputClass} mt-1`}
                 value={form.size}
                 onChange={(event) => set("size", event.target.value)}
@@ -261,23 +312,25 @@ export default function PurchaseForm({
               />
             </span>
           </label>
-          <label className="block min-w-0 text-sm">
-            采购平台
-            <select
-              aria-label="采购平台"
-              className={`${inputClass} mt-1`}
-              value={form.platform}
-              onChange={(event) =>
-                set("platform", event.target.value as Platform)
-              }
-            >
-              {PLATFORMS.map((item) => (
-                <option key={item.value} value={item.value}>
-                  {item.label}
-                </option>
-              ))}
-            </select>
-          </label>
+          {showPlatform && (
+            <label className="block min-w-0 text-sm">
+              采购平台
+              <select
+                aria-label="采购平台"
+                className={`${inputClass} mt-1`}
+                value={form.platform}
+                onChange={(event) =>
+                  set("platform", event.target.value as Platform)
+                }
+              >
+                {PLATFORMS.map((item) => (
+                  <option key={item.value} value={item.value}>
+                    {item.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+          )}
           <label className="block min-w-0 text-sm">
             当前状态
             <select
@@ -306,6 +359,9 @@ export default function PurchaseForm({
           </label>
           {checkingImage && (
             <p className="text-xs text-muted">正在检查该货号的历史图片…</p>
+          )}
+          {catalogMessage && (
+            <p role="status" className="text-xs text-tint">{catalogMessage}</p>
           )}
           {existingImage && (
             <div className="rounded-xl bg-background p-3">

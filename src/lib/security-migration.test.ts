@@ -18,7 +18,11 @@ const shippingMigrationPath = path.resolve(
   __dirname,
   "../../supabase/migrations/0006_shipping_events.sql",
 );
-const migration = [secureMigrationPath, integrityMigrationPath, rebateMigrationPath, shippingMigrationPath]
+const importMigrationPath = path.resolve(
+  __dirname,
+  "../../supabase/migrations/0007_account_import_catalog_sizes.sql",
+);
+const migration = [secureMigrationPath, integrityMigrationPath, rebateMigrationPath, shippingMigrationPath, importMigrationPath]
   .map((migrationPath) => fs.readFileSync(migrationPath, "utf8"))
   .join("\n");
 
@@ -88,5 +92,28 @@ describe("secure migration RPC contracts", () => {
     expect(body).toMatch(/delete from monthly_rebates where user_id = v_uid/i);
     expect(body).toMatch(/'rebates',c_rebates/i);
     expect(body).toMatch(/delete from shipping_events where user_id = v_uid/i);
+  });
+
+  it("keeps spreadsheet imports atomic, owned, and limited to bulk accounts", () => {
+    const body = functionBody("import_purchases_from_spreadsheet");
+    expect(body).toMatch(/v_uid uuid := require_uid\(\)/i);
+    expect(body).toMatch(/workflow = 'bulk'/i);
+    expect(body).toMatch(/jsonb_array_length\(p_rows\) > 1000/i);
+    expect(body).toMatch(/v_units \+ v_qty > 5000/i);
+    expect(body).toMatch(/unique_violation[^]*SPREADSHEET_ALREADY_IMPORTED/i);
+  });
+
+  it("shares only verified catalog metadata while keeping inventory writes owned", () => {
+    const body = functionBody("import_purchases_from_spreadsheet");
+    expect(body).toMatch(/from catalog_products[^]*normalized_style_code/i);
+    expect(body).toMatch(/insert into products\(user_id[^]*v_uid/i);
+    expect(body).toMatch(/insert into inventory_units\([^]*user_id[^]*v_uid/i);
+  });
+
+  it("assigns sizes without creating or deleting inventory rows", () => {
+    const body = functionBody("assign_unit_sizes");
+    expect(body).toMatch(/update inventory_units[^]*set size = v_size/i);
+    expect(body).not.toMatch(/insert into inventory_units/i);
+    expect(body).not.toMatch(/delete from inventory_units/i);
   });
 });

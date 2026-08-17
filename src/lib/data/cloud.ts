@@ -3,11 +3,14 @@ import type {
   ClearResult,
   DbAdapter,
   DeleteResult,
+  ImportPurchasesResult,
   PurchaseResult,
   ShipUnitsResult,
 } from "@/lib/data/types";
 import type {
+  AccountPreferences,
   Attachment,
+  CatalogProduct,
   InventoryUnit,
   MonthlyRebate,
   Product,
@@ -134,6 +137,26 @@ export function createSupabaseAdapter(): DbAdapter {
         return unwrap(response.data, response.error);
       });
     },
+    getAccountPreferences: () => cached("account-preferences", async () => {
+      const response = await withDataTimeout(
+        client.rpc("get_my_account_preferences", {}) as PromiseLike<
+          QueryResponse<AccountPreferences>
+        >,
+      );
+      if (["42883", "PGRST202"].includes(response.error?.code ?? "")) {
+        return { user_id: "", workflow: "standard", updated_at: "" };
+      }
+      return unwrap(response.data, response.error);
+    }),
+    listCatalogProducts: () => cached("catalog-products", () =>
+      request<CatalogProduct[]>(
+        client
+          .from("catalog_products")
+          .select("*")
+          .order("normalized_style_code") as PromiseLike<
+          QueryResponse<CatalogProduct[]>
+        >,
+      )),
     async listShippingEvents() {
       return cached("shipping-events", async () => {
         const response = await withDataTimeout(
@@ -179,6 +202,15 @@ export function createSupabaseAdapter(): DbAdapter {
       );
       return unwrap(response.data, response.error).signedUrl;
     },
+    async catalogImageUrl(catalogProduct) {
+      if (!catalogProduct.image_path) {
+        throw new DataAccessError("该商品资料没有图片", false);
+      }
+      const response = await withDataTimeout(
+        client.storage.from(BUCKET).createSignedUrl(catalogProduct.image_path, 900),
+      );
+      return unwrap(response.data, response.error).signedUrl;
+    },
     async saveAttachment(input) {
       const auth = await withDataTimeout(client.auth.getUser());
       if (auth.error) throw new DataAccessError(auth.error.message, false);
@@ -220,6 +252,16 @@ export function createSupabaseAdapter(): DbAdapter {
     },
     createPurchase: (input) => afterMutation(
       rpc<PurchaseResult>("create_purchase_simple", { p_input: input }),
+    ),
+    importPurchases: (input) => afterMutation(
+      rpc<ImportPurchasesResult>("import_purchases_from_spreadsheet", {
+        p_rows: input.rows,
+        p_file_hash: input.fileHash,
+        p_purchased_at: input.purchasedAt,
+      }),
+    ),
+    assignUnitSizes: (assignments) => afterMutation(
+      rpc<number>("assign_unit_sizes", { p_assignments: assignments }),
     ),
     shipUnits: (input) =>
       afterMutation(rpc<ShipUnitsResult>("record_shipment", {
