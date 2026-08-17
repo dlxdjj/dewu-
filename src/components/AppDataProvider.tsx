@@ -122,10 +122,13 @@ function FriendAccountWelcome() {
     <div
       role="status"
       aria-live="polite"
-      className="mx-auto mt-20 max-w-sm rounded-[28px] border border-separator bg-card p-6 text-center shadow-[var(--cirrus-shadow-2)]"
+      className="friend-welcome-screen fixed inset-0 z-[100] flex min-h-dvh items-center justify-center px-6 text-center"
     >
-      <h1 className="text-lg font-semibold">欢迎孙老板</h1>
-      <p className="mt-2 text-sm leading-6 text-muted">孙老板发大财</p>
+      <div className="-translate-y-6">
+        <p className="text-sm font-medium tracking-[0.22em] text-tint">WELCOME</p>
+        <h1 className="mt-4 text-[32px] font-bold leading-tight">欢迎孙老板</h1>
+        <p className="mt-3 text-lg leading-7 text-muted">孙老板发大财</p>
+      </div>
     </div>
   );
 }

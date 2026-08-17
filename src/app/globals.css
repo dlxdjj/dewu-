@@ -130,6 +130,15 @@ h3 {
   color: var(--cirrus-quantity-text);
 }
 
+/* 好友账户首次加载时使用整屏欢迎页，并覆盖固定底部导航。 */
+.friend-welcome-screen {
+  padding-top: env(safe-area-inset-top);
+  padding-bottom: env(safe-area-inset-bottom);
+  background-color: var(--app-status-background);
+  background-image: var(--app-background-image);
+  background-size: 100% 100%;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .inventory-action-button {
     transition: none;

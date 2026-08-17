@@ -114,6 +114,12 @@ describe("AppDataProvider account switching", () => {
 
     expect(await screen.findByText("欢迎孙老板")).toBeInTheDocument();
     expect(screen.getByText("孙老板发大财")).toBeInTheDocument();
+    expect(screen.getByRole("status")).toHaveClass(
+      "friend-welcome-screen",
+      "fixed",
+      "inset-0",
+      "z-[100]",
+    );
     expect(screen.queryByText("无账户数据")).not.toBeInTheDocument();
 
     act(() => units.resolve([]));
