@@ -4,7 +4,6 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Card from "@/components/ui/Card";
 import PageHeader from "@/components/ui/PageHeader";
-import ThemePicker from "@/components/settings/ThemePicker";
 import { dbKind, getDb } from "@/lib/data";
 import {
   clearAllData,
@@ -78,10 +77,6 @@ export default function SettingsPage() {
           >
             退出登录
           </button>
-        </Card>
-
-        <Card>
-          <ThemePicker />
         </Card>
 
         <Card>

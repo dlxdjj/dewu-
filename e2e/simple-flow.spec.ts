@@ -69,10 +69,13 @@ test("390px no-session page does not overflow", async ({ page }) => {
   expect(width.scroll).toBeLessThanOrEqual(width.client);
 });
 
-test("390px settings switches and preserves all four visual themes", async ({
+test("390px settings keeps the original Cirrus theme only", async ({
   page,
 }) => {
   await installAuthenticatedSession(page);
+  await page.addInitScript(() => {
+    localStorage.setItem("dewu_app_theme", "voltura");
+  });
   await page.route("**/rest/v1/**", (route) => {
     if (route.request().url().includes("/rpc/get_my_account_preferences")) {
       return route.fulfill({
@@ -87,35 +90,26 @@ test("390px settings switches and preserves all four visual themes", async ({
   });
 
   await page.goto("/settings/");
-  for (const [label, value] of [
-    ["像素工坊", "spritecraft"],
-    ["伏特夜航", "voltura"],
-    ["流明边界", "lumen"],
-    ["云海", "cirrus"],
-  ] as const) {
-    await page.getByRole("button", { name: new RegExp(label) }).click();
-    await expect(page.locator("html")).toHaveAttribute("data-theme", value);
-    const width = await page.evaluate(() => ({
-      client: document.documentElement.clientWidth,
-      scroll: document.documentElement.scrollWidth,
-    }));
-    expect(width.scroll).toBeLessThanOrEqual(width.client);
+  await expect(page.locator("html")).toHaveAttribute("data-theme", "cirrus");
+  await expect(page.getByText("外观主题")).toHaveCount(0);
+  await expect(page.getByRole("button", { name: /像素工坊|伏特夜航|流明边界/ })).toHaveCount(0);
+  const width = await page.evaluate(() => ({
+    client: document.documentElement.clientWidth,
+    scroll: document.documentElement.scrollWidth,
+  }));
+  expect(width.scroll).toBeLessThanOrEqual(width.client);
 
-    await page.goto("/");
-    const profitLabel = page.locator("p").filter({ hasText: /^\d+月利润$/ }).first();
-    await expect(profitLabel).toBeVisible();
-    const profitCard = profitLabel.locator("..");
-    const colors = await profitCard.evaluate((card) => ({
-      background: getComputedStyle(card).backgroundColor,
-      amount: getComputedStyle(card.querySelectorAll("p")[1]).color,
-    }));
-    expect(contrastRatio(colors.amount, colors.background)).toBeGreaterThanOrEqual(4.5);
-    await page.goto("/settings/");
-  }
-
-  await page.getByRole("button", { name: /伏特夜航/ }).click();
+  await page.goto("/");
+  const profitLabel = page.locator("p").filter({ hasText: /^\d+月利润$/ }).first();
+  await expect(profitLabel).toBeVisible();
+  const profitCard = profitLabel.locator("..");
+  const colors = await profitCard.evaluate((card) => ({
+    background: getComputedStyle(card).backgroundColor,
+    amount: getComputedStyle(card.querySelectorAll("p")[1]).color,
+  }));
+  expect(contrastRatio(colors.amount, colors.background)).toBeGreaterThanOrEqual(4.5);
   await page.reload();
-  await expect(page.locator("html")).toHaveAttribute("data-theme", "voltura");
+  await expect(page.locator("html")).toHaveAttribute("data-theme", "cirrus");
 });
 
 test("390px add form keeps the purchase date inside the viewport", async ({
