@@ -167,9 +167,10 @@ export default function HomePage({
             <h2 className="font-semibold">待办事项</h2>
             <Link href="/inventory" className="text-sm text-tint">查看库存</Link>
           </div>
-          <div className="grid grid-cols-2 gap-2 md:grid-cols-5">
+          <div className="grid grid-cols-2 gap-2 md:grid-cols-3">
             {[
               ["未到货", displayed.todoCounts.pending, "/inventory?view=active&status=pending"],
+              ["已到货", displayed.todoCounts.arrived, "/inventory?view=active&status=arrived"],
               ["发往得物途中", displayed.todoCounts.shipping, "/inventory?view=active&status=shipping"],
               ["得物仓未售", displayed.todoCounts.in_stock_dewu, "/inventory?view=active&status=in_stock_dewu"],
               ["待结算", displayed.todoCounts.sold, "/inventory?view=settlement"],

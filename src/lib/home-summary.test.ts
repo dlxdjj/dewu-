@@ -96,6 +96,7 @@ describe("buildHomeSummary", () => {
       monthlyProfitCents: 6500,
       todoCounts: {
         pending: 0,
+        arrived: 1,
         shipping: 0,
         in_stock_dewu: 0,
         sold: 0,

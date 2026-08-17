@@ -54,6 +54,10 @@ describe("HomePage", () => {
     expect(screen.queryByText("…")).not.toBeInTheDocument();
     expect(screen.getAllByText("¥30.00")).toHaveLength(2);
     expect(screen.getByText("含返利 ¥30.00")).toBeInTheDocument();
+    expect(screen.getByText("已到货").closest("a")).toHaveAttribute(
+      "href",
+      "/inventory?view=active&status=arrived",
+    );
     expect(
       screen.getByText("本月暂无已结算销售；当前利润来自返利收入。"),
     ).toBeInTheDocument();

@@ -14,7 +14,7 @@ export interface HomeSummary {
   monthlyShippingCents: number;
   monthlyRebateCents: number;
   monthlyProfitCents: number;
-  todoCounts: Pick<Record<UnitStatus, number>, "pending" | "shipping" | "in_stock_dewu" | "sold" | "returned">;
+  todoCounts: Pick<Record<UnitStatus, number>, "pending" | "arrived" | "shipping" | "in_stock_dewu" | "sold" | "returned">;
 }
 
 export function buildHomeSummary(
@@ -78,6 +78,7 @@ export function buildHomeSummary(
       settled.reduce((sum, row) => sum + row.profit, 0) + monthlyRebateCents,
     todoCounts: {
       pending: count("pending"),
+      arrived: count("arrived"),
       shipping: count("shipping"),
       in_stock_dewu: count("in_stock_dewu"),
       sold: count("sold"),
