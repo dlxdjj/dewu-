@@ -6,6 +6,7 @@ import Card from "@/components/ui/Card";
 import PageHeader from "@/components/ui/PageHeader";
 import Stat from "@/components/ui/Stat";
 import { useAppData } from "@/components/AppDataProvider";
+import { supportsRebateIncome } from "@/lib/account-features";
 import { getDb } from "@/lib/data";
 import {
   buildHomeSummary,
@@ -14,11 +15,16 @@ import {
 import { formatCents } from "@/lib/utils/money";
 
 interface HomeDataSource {
+  getAccountPreferences: ReturnType<typeof getDb>["getAccountPreferences"];
   listSales: ReturnType<typeof getDb>["listSales"];
   listUnits: ReturnType<typeof getDb>["listUnits"];
   listRebates: ReturnType<typeof getDb>["listRebates"];
   listShippingEvents: ReturnType<typeof getDb>["listShippingEvents"];
   listShippingEventItems: ReturnType<typeof getDb>["listShippingEventItems"];
+}
+
+interface HomeViewData extends HomeSummary {
+  rebatesEnabled: boolean;
 }
 
 export default function HomePage({
@@ -29,7 +35,7 @@ export default function HomePage({
   now?: Date;
 } = {}) {
   const [referenceNow] = useState(() => now ?? new Date());
-  const [data, setData] = useState<HomeSummary | null>(null);
+  const [data, setData] = useState<HomeViewData | null>(null);
   const [error, setError] = useState("");
   const [attempt, setAttempt] = useState(0);
   const shared = useAppData();
@@ -49,22 +55,35 @@ export default function HomePage({
           if (shared.error) throw new Error(shared.error);
           if (!shared.data) return;
           const snapshot = shared.data;
-          if (active) setData(buildHomeSummary(
-            snapshot.units, snapshot.sales, snapshot.rebates,
-            snapshot.shippingEvents, snapshot.shippingEventItems, referenceNow,
-          ));
+          const rebatesEnabled = supportsRebateIncome(snapshot.preferences.workflow);
+          if (active) setData({
+            ...buildHomeSummary(
+              snapshot.units,
+              snapshot.sales,
+              rebatesEnabled ? snapshot.rebates : [],
+              snapshot.shippingEvents,
+              snapshot.shippingEventItems,
+              referenceNow,
+            ),
+            rebatesEnabled,
+          });
           return;
         }
         const db = dataSource ?? getDb();
+        const preferences = await db.getAccountPreferences();
+        const rebatesEnabled = supportsRebateIncome(preferences.workflow);
         const [units, sales, rebates, shippingEvents, shippingEventItems] = await Promise.all([
           db.listUnits(),
           db.listSales(),
-          db.listRebates(),
+          rebatesEnabled ? db.listRebates() : Promise.resolve([]),
           db.listShippingEvents(),
           db.listShippingEventItems(),
         ]);
         if (active) {
-          setData(buildHomeSummary(units, sales, rebates, shippingEvents, shippingEventItems, referenceNow));
+          setData({
+            ...buildHomeSummary(units, sales, rebates, shippingEvents, shippingEventItems, referenceNow),
+            rebatesEnabled,
+          });
         }
       } catch (reason: unknown) {
         if (!active) return;
@@ -79,14 +98,20 @@ export default function HomePage({
 
   const monthLabel = `${referenceNow.getMonth() + 1}月`;
   const displayed = !dataSource && shared?.data
-    ? buildHomeSummary(
-        shared.data.units,
-        shared.data.sales,
-        shared.data.rebates,
-        shared.data.shippingEvents,
-        shared.data.shippingEventItems,
-        referenceNow,
-      )
+    ? (() => {
+        const rebatesEnabled = supportsRebateIncome(shared.data.preferences.workflow);
+        return {
+          ...buildHomeSummary(
+            shared.data.units,
+            shared.data.sales,
+            rebatesEnabled ? shared.data.rebates : [],
+            shared.data.shippingEvents,
+            shared.data.shippingEventItems,
+            referenceNow,
+          ),
+          rebatesEnabled,
+        };
+      })()
     : data;
 
   return (
@@ -126,9 +151,11 @@ export default function HomePage({
             label={`${displayed?.monthLabel ?? monthLabel}利润`}
             value={displayed ? formatCents(displayed.monthlyProfitCents) : "…"}
             hint={
-              displayed
+              displayed?.rebatesEnabled
                 ? `含返利 ${formatCents(displayed.monthlyRebateCents)}`
-                : "含返利收入"
+                : displayed
+                  ? "按实际到账减进价和运费"
+                  : "按实际到账"
             }
             featured
           />
@@ -137,9 +164,11 @@ export default function HomePage({
               role="status"
               className="col-span-2 rounded-2xl bg-card px-4 py-3 text-sm leading-6 text-muted md:col-span-4"
             >
-              {displayed.monthlyRebateCents > 0
+              {displayed.rebatesEnabled && displayed.monthlyRebateCents > 0
                 ? "本月暂无已结算销售；当前利润来自返利收入。"
-                : "本月暂无已结算销售；完成结算或录入返利后将显示利润。"}
+                : displayed.rebatesEnabled
+                  ? "本月暂无已结算销售；完成结算或录入返利后将显示利润。"
+                  : "本月暂无已结算销售；完成结算后将显示利润。"}
             </p>
           )}
           <Card className="col-span-2 md:col-span-4">
@@ -152,12 +181,14 @@ export default function HomePage({
                 {displayed ? formatCents(displayed.monthlyShippingCents) : "…"}
               </p>
             </div>
-            <div className="mt-3 flex items-center justify-between gap-4 border-t border-separator pt-3">
-              <p className="text-sm">返利收入</p>
-              <p className="shrink-0 text-lg font-semibold tabular-nums text-[#21815C]">
-                {displayed ? formatCents(displayed.monthlyRebateCents) : "…"}
-              </p>
-            </div>
+            {displayed?.rebatesEnabled && (
+              <div className="mt-3 flex items-center justify-between gap-4 border-t border-separator pt-3">
+                <p className="text-sm">返利收入</p>
+                <p className="shrink-0 text-lg font-semibold tabular-nums text-[#21815C]">
+                  {formatCents(displayed.monthlyRebateCents)}
+                </p>
+              </div>
+            )}
           </Card>
         </div>
       )}

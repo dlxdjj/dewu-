@@ -66,4 +66,23 @@ describe("monthly rebates", () => {
     ).rejects.toThrow("注入事务故障");
     expect(db.snapshot()).toEqual(before);
   });
+
+  it("rejects rebate writes for a bulk account", async () => {
+    const db = new MemoryDbAdapter({
+      preferences: {
+        user_id: "friend",
+        workflow: "bulk",
+        updated_at: "2026-08-01T00:00:00Z",
+      },
+    });
+
+    await expect(
+      saveMonthlyRebates(db, {
+        month: "2026-08",
+        taobaoAllianceYuan: "10",
+        jingfenYuan: "20",
+      }),
+    ).rejects.toThrow("当前账号不支持返利收入");
+    expect(db.snapshot().rebates).toEqual([]);
+  });
 });

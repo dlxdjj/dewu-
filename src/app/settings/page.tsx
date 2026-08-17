@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Card from "@/components/ui/Card";
 import PageHeader from "@/components/ui/PageHeader";
+import { useAppData } from "@/components/AppDataProvider";
 import { dbKind, getDb } from "@/lib/data";
 import {
   clearAllData,
@@ -13,6 +14,8 @@ import { getSession, signOut } from "@/lib/supabase/auth";
 
 export default function SettingsPage() {
   const router = useRouter();
+  const shared = useAppData();
+  const bulk = shared?.data?.preferences.workflow === "bulk";
   const [email, setEmail] = useState("");
   const [confirmation, setConfirmation] = useState("");
   const [message, setMessage] = useState("");
@@ -97,7 +100,9 @@ export default function SettingsPage() {
         <Card className="border border-danger/30 md:col-span-2">
           <h2 className="font-medium text-danger">清空全部数据</h2>
           <p className="mt-1 text-xs leading-5 text-muted">
-            删除当前账户的商品、批次、单件、销售、返利、历史和附件元数据。此操作无法撤销。
+            {bulk
+              ? "删除当前账户的商品、批次、单件、销售、历史和附件元数据。此操作无法撤销。"
+              : "删除当前账户的商品、批次、单件、销售、返利、历史和附件元数据。此操作无法撤销。"}
           </p>
           <label className="mt-3 block text-sm">
             确认词（必填）

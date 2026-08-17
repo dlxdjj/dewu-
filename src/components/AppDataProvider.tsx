@@ -3,6 +3,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 import { usePathname } from "next/navigation";
 import { getDb } from "@/lib/data";
+import { supportsRebateIncome } from "@/lib/account-features";
 import { toAppPathname } from "@/lib/base-path";
 import type {
   AccountPreferences,
@@ -47,10 +48,22 @@ export default function AppDataProvider({ children }: { children: React.ReactNod
     setLoading(true);
     try {
       const db = getDb();
-      const [preferences, units, products, batches, sales, rebates, shippingEvents, shippingEventItems] = await Promise.all([
-        db.getAccountPreferences(),
-        db.listUnits(), db.listProducts(), db.listBatches(), db.listSales(),
-        db.listRebates(), db.listShippingEvents(), db.listShippingEventItems(),
+      const preferencesPromise = db.getAccountPreferences();
+      const unitsPromise = db.listUnits();
+      const productsPromise = db.listProducts();
+      const batchesPromise = db.listBatches();
+      const salesPromise = db.listSales();
+      const shippingEventsPromise = db.listShippingEvents();
+      const shippingEventItemsPromise = db.listShippingEventItems();
+      const preferences = await preferencesPromise;
+      const [units, products, batches, sales, rebates, shippingEvents, shippingEventItems] = await Promise.all([
+        unitsPromise,
+        productsPromise,
+        batchesPromise,
+        salesPromise,
+        supportsRebateIncome(preferences.workflow) ? db.listRebates() : Promise.resolve([]),
+        shippingEventsPromise,
+        shippingEventItemsPromise,
       ]);
       setData({ preferences, units, products, batches, sales, rebates, shippingEvents, shippingEventItems });
     } catch (reason) {

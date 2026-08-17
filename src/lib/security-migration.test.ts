@@ -22,7 +22,11 @@ const importMigrationPath = path.resolve(
   __dirname,
   "../../supabase/migrations/0007_account_import_catalog_sizes.sql",
 );
-const migration = [secureMigrationPath, integrityMigrationPath, rebateMigrationPath, shippingMigrationPath, importMigrationPath]
+const rebateGuardMigrationPath = path.resolve(
+  __dirname,
+  "../../supabase/migrations/0008_bulk_rebate_guard.sql",
+);
+const migration = [secureMigrationPath, integrityMigrationPath, rebateMigrationPath, shippingMigrationPath, importMigrationPath, rebateGuardMigrationPath]
   .map((migrationPath) => fs.readFileSync(migrationPath, "utf8"))
   .join("\n");
 
@@ -82,6 +86,8 @@ describe("secure migration RPC contracts", () => {
   it("saves both owned rebate sources atomically", () => {
     const body = functionBody("save_monthly_rebates");
     expect(body).toMatch(/v_uid uuid := require_uid\(\)/i);
+    expect(body).toMatch(/account_preferences[^]*workflow = 'standard'/i);
+    expect(body).toMatch(/raise exception 'REBATE_NOT_AVAILABLE'/i);
     expect(body).toMatch(/p_taobao_alliance_cents\s*<\s*0/i);
     expect(body).toMatch(/p_jingfen_cents\s*<\s*0/i);
     expect(body).toMatch(/on conflict\(user_id,month,source\)/i);

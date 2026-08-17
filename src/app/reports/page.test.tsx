@@ -2,10 +2,21 @@ import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { MemoryDbAdapter } from "@/lib/data/memory";
+import type { AccountWorkflow, MonthlyRebate } from "@/lib/types/database";
 import ReportsPage from "./page";
 
-async function settledDb(): Promise<MemoryDbAdapter> {
-  const db = new MemoryDbAdapter();
+async function settledDb(
+  workflow: AccountWorkflow = "standard",
+  rebates: MonthlyRebate[] = [],
+): Promise<MemoryDbAdapter> {
+  const db = new MemoryDbAdapter({
+    preferences: {
+      user_id: workflow === "bulk" ? "friend" : "owner",
+      workflow,
+      updated_at: "2026-08-01T00:00:00Z",
+    },
+    rebates,
+  });
   const august = await db.createPurchase({
     productName: "八月鞋",
     styleCode: "AUG-001",
@@ -155,5 +166,27 @@ describe("ReportsPage", () => {
         }),
       ]),
     );
+  });
+
+  it("removes rebate controls and rebate totals for a bulk account", async () => {
+    const staleRebate: MonthlyRebate = {
+      id: "legacy-rebate",
+      user_id: "friend",
+      month: "2026-08-01",
+      source: "taobao_alliance",
+      amount_cents: 50000,
+      created_at: "2026-08-01T00:00:00Z",
+      updated_at: "2026-08-01T00:00:00Z",
+    };
+    const db = await settledDb("bulk", [staleRebate]);
+    const listRebates = vi.spyOn(db, "listRebates");
+
+    render(<ReportsPage dataSource={db} initialMonth="2026-08" />);
+
+    const monthly = await screen.findByRole("region", { name: "8月统计" });
+    expect(within(monthly).getByText("¥40.00")).toBeInTheDocument();
+    expect(screen.getByText("已结算实际到账")).toBeInTheDocument();
+    expect(screen.queryByText(/返利/)).not.toBeInTheDocument();
+    expect(listRebates).not.toHaveBeenCalled();
   });
 });

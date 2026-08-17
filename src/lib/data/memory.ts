@@ -700,6 +700,9 @@ export class MemoryDbAdapter implements DbAdapter {
   async saveMonthlyRebates(input: SaveMonthlyRebatesInput) {
     return clone(
       this.transaction((draft, mutate) => {
+        if (draft.preferences.workflow !== "standard") {
+          throw new Error("当前账号不支持返利收入");
+        }
         assertCents(input.taobaoAllianceCents, "淘宝联盟返利");
         assertCents(input.jingfenCents, "京粉返利");
         if (!/^\d{4}-(0[1-9]|1[0-2])-01$/.test(input.month)) {

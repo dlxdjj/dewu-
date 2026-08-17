@@ -5,6 +5,7 @@ import Card from "@/components/ui/Card";
 import PageHeader from "@/components/ui/PageHeader";
 import Stat from "@/components/ui/Stat";
 import { useAppData } from "@/components/AppDataProvider";
+import { supportsRebateIncome } from "@/lib/account-features";
 import { REBATE_SOURCE_LABELS, type RebateSource } from "@/lib/constants/rebate";
 import { getDb } from "@/lib/data";
 import type { DbAdapter } from "@/lib/data/types";
@@ -15,6 +16,7 @@ import {
 } from "@/lib/reports";
 import { saveMonthlyRebates } from "@/lib/services/rebate";
 import type {
+  AccountPreferences,
   InventoryUnit,
   MonthlyRebate,
   Product,
@@ -27,6 +29,7 @@ import { monthKey } from "@/lib/utils/format";
 import { formatCents, normalizeMoneyInput } from "@/lib/utils/money";
 
 interface ReportSource {
+  preferences: AccountPreferences;
   units: InventoryUnit[];
   products: Product[];
   batches: PurchaseBatch[];
@@ -56,23 +59,27 @@ export default function ReportsPage({
       return () => { active = false; };
     }
     const db = dataSource ?? getDb();
-    Promise.all([
-      db.listUnits(),
-      db.listProducts(),
-      db.listBatches(),
-      db.listSales(),
-      db.listRebates(),
-      db.listShippingEvents(),
-      db.listShippingEventItems(),
-    ])
-      .then(([units, products, batches, sales, rebates, shippingEvents, shippingEventItems]) => {
-        if (active) setRaw({ units, products, batches, sales, rebates, shippingEvents, shippingEventItems });
-      })
-      .catch((reason: unknown) => {
+    async function load(): Promise<void> {
+      try {
+        const preferences = await db.getAccountPreferences();
+        const rebatesEnabled = supportsRebateIncome(preferences.workflow);
+        const [units, products, batches, sales, rebates, shippingEvents, shippingEventItems] = await Promise.all([
+          db.listUnits(),
+          db.listProducts(),
+          db.listBatches(),
+          db.listSales(),
+          rebatesEnabled ? db.listRebates() : Promise.resolve([]),
+          db.listShippingEvents(),
+          db.listShippingEventItems(),
+        ]);
+        if (active) setRaw({ preferences, units, products, batches, sales, rebates, shippingEvents, shippingEventItems });
+      } catch (reason: unknown) {
         if (active) {
           setError(reason instanceof Error ? reason.message : "加载失败");
         }
-      });
+      }
+    }
+    void load();
     return () => {
       active = false;
     };
@@ -80,16 +87,22 @@ export default function ReportsPage({
 
   const source = !dataSource && shared ? shared.data : raw;
   const displayError = !dataSource && shared ? shared.error : error;
+  const rebatesEnabled = source
+    ? supportsRebateIncome(source.preferences.workflow)
+    : true;
 
   const report = useMemo(
-    () => (source ? buildSettlementReport({ ...source, month }) : null),
-    [source, month],
+    () => (source ? buildSettlementReport({ ...source, month, includeRebates: rebatesEnabled }) : null),
+    [source, month, rebatesEnabled],
   );
   const monthText = `${Number(month.slice(5))}月`;
 
   return (
     <>
-      <PageHeader title="报表" subtitle="已结算实际到账 + 返利收入" />
+      <PageHeader
+        title="报表"
+        subtitle={rebatesEnabled ? "已结算实际到账 + 返利收入" : "已结算实际到账"}
+      />
       {displayError ? (
         <Card>
           <p role="alert" className="text-sm text-danger">
@@ -103,6 +116,7 @@ export default function ReportsPage({
             title="历史累计"
             summary={report?.allTime ?? null}
             lifetime
+            showRebates={rebatesEnabled}
           />
           <label className="mt-4 block min-w-0 text-sm">
             月份
@@ -116,7 +130,7 @@ export default function ReportsPage({
               />
             </span>
           </label>
-          {source && (
+          {source && rebatesEnabled && (
             <RebateEditor
               key={month}
               month={month}
@@ -141,17 +155,20 @@ export default function ReportsPage({
           )}
           <SummarySection
             ariaLabel={`${monthText}统计`}
-            title={`${monthText}结算与返利`}
+            title={rebatesEnabled ? `${monthText}结算与返利` : `${monthText}结算`}
             summary={report?.selectedMonth ?? null}
+            showRebates={rebatesEnabled}
           />
           {report?.selectedMonth.salesCount === 0 && (
             <p
               role="status"
               className="mt-3 rounded-2xl bg-card px-4 py-3 text-sm leading-6 text-muted"
             >
-              {report.selectedMonth.rebateCents > 0
+              {rebatesEnabled && report.selectedMonth.rebateCents > 0
                 ? "本月暂无已结算记录；已录入的返利仍计入本月利润。"
-                : "本月暂无已结算记录；完成结算或录入返利后将显示利润。"}
+                : rebatesEnabled
+                  ? "本月暂无已结算记录；完成结算或录入返利后将显示利润。"
+                  : "本月暂无已结算记录；完成结算后将显示利润。"}
             </p>
           )}
         </>
@@ -162,7 +179,7 @@ export default function ReportsPage({
         onClick={() => {
           if (!report) return;
           const url = URL.createObjectURL(
-            new Blob([buildCsv(report, month)], {
+            new Blob([buildCsv(report, month, { includeRebates: rebatesEnabled })], {
               type: "text/csv;charset=utf-8",
             }),
           );
@@ -287,11 +304,13 @@ function SummarySection({
   title,
   summary,
   lifetime = false,
+  showRebates = true,
 }: {
   ariaLabel: string;
   title: string;
   summary: SettlementSummary | null;
   lifetime?: boolean;
+  showRebates?: boolean;
 }) {
   return (
     <section aria-label={ariaLabel} className="mt-3">
@@ -301,7 +320,9 @@ function SummarySection({
           label={lifetime ? "总利润" : "利润"}
           value={summary ? formatCents(summary.profitCents) : "…"}
           hint={
-            summary ? `含返利 ${formatCents(summary.rebateCents)}` : undefined
+            summary && showRebates
+              ? `含返利 ${formatCents(summary.rebateCents)}`
+              : undefined
           }
           compact
         />

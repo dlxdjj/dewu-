@@ -209,4 +209,31 @@ describe("settlement reports", () => {
     expect(csv).toContain("测试鞋,42,8000,500,12000,3500,2026-08-03");
     expect(csv).toContain("淘宝联盟,2026-08,1000");
   });
+
+  it("excludes rebates from bulk-account profit and CSV exports", () => {
+    const input = reportInput();
+    input.includeRebates = false;
+
+    const report = buildSettlementReport(input);
+    const csv = buildCsv(report, "2026-08", { includeRebates: false });
+
+    expect(report.allTime).toEqual({
+      profitCents: 8500,
+      rebateCents: 0,
+      salesCents: 24000,
+      salesCount: 2,
+      shippingCents: 0,
+    });
+    expect(report.selectedMonth).toEqual({
+      profitCents: 3500,
+      rebateCents: 0,
+      salesCents: 12000,
+      salesCount: 1,
+      shippingCents: 0,
+    });
+    expect(report.rebates).toEqual([]);
+    expect(csv).toContain("范围,利润(分),运费支出(分),销售额(分),销量");
+    expect(csv).toContain("历史累计,8500,0,24000,2");
+    expect(csv).not.toContain("返利");
+  });
 });

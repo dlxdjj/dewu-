@@ -227,6 +227,16 @@ test("390px rebate form is readable and saves both sources", async ({
 }) => {
   await installAuthenticatedSession(page);
   await page.route("**/rest/v1/**", async (route) => {
+    if (route.request().url().includes("/rpc/get_my_account_preferences")) {
+      await route.fulfill({
+        json: {
+          user_id: "test-user",
+          workflow: "standard",
+          updated_at: "2026-08-17T00:00:00Z",
+        },
+      });
+      return;
+    }
     if (route.request().url().includes("/rpc/save_monthly_rebates")) {
       await route.fulfill({
         json: [
@@ -273,6 +283,37 @@ test("390px rebate form is readable and saves both sources", async ({
     scroll: document.documentElement.scrollWidth,
   }));
   expect(width.scroll).toBeLessThanOrEqual(width.client);
+});
+
+test("390px bulk account has no rebate income feature", async ({ page }) => {
+  await installAuthenticatedSession(page);
+  let rebateReads = 0;
+  await page.route("**/rest/v1/**", async (route) => {
+    const url = route.request().url();
+    if (url.includes("/rpc/get_my_account_preferences")) {
+      await route.fulfill({
+        json: {
+          user_id: "friend",
+          workflow: "bulk",
+          updated_at: "2026-08-17T00:00:00Z",
+        },
+      });
+      return;
+    }
+    if (url.includes("/monthly_rebates")) rebateReads += 1;
+    await route.fulfill({ json: [] });
+  });
+
+  await page.goto("/");
+  await expect(page.getByText("按实际到账减进价和运费")).toBeVisible();
+  await expect(page.getByText(/返利/)).toHaveCount(0);
+
+  await page.goto("/reports/");
+  await expect(page.getByText("已结算实际到账")).toBeVisible();
+  await expect(page.getByLabel("淘宝联盟返利")).toHaveCount(0);
+  await expect(page.getByLabel("京粉返利")).toHaveCount(0);
+  await expect(page.getByText(/返利/)).toHaveCount(0);
+  expect(rebateReads).toBe(0);
 });
 
 test("390px report centers a long sales amount inside its card", async ({

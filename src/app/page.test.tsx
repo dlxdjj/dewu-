@@ -1,8 +1,9 @@
 import { render, screen } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import HomePage from "./page";
 
 const dataMocks = vi.hoisted(() => ({
+  getAccountPreferences: vi.fn(),
   listUnits: vi.fn(),
   listSales: vi.fn(),
   listRebates: vi.fn(),
@@ -11,6 +12,7 @@ const dataMocks = vi.hoisted(() => ({
 }));
 
 const dataSource = {
+  getAccountPreferences: dataMocks.getAccountPreferences,
   listUnits: dataMocks.listUnits,
   listSales: dataMocks.listSales,
   listRebates: dataMocks.listRebates,
@@ -19,9 +21,21 @@ const dataSource = {
 };
 
 describe("HomePage", () => {
-  it("renders exactly the four agreed metrics for the current month", async () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    dataMocks.getAccountPreferences.mockResolvedValue({
+      user_id: "owner",
+      workflow: "standard",
+      updated_at: "2026-08-01T00:00:00Z",
+    });
     dataMocks.listUnits.mockResolvedValue([]);
     dataMocks.listSales.mockResolvedValue([]);
+    dataMocks.listRebates.mockResolvedValue([]);
+    dataMocks.listShippingEvents.mockResolvedValue([]);
+    dataMocks.listShippingEventItems.mockResolvedValue([]);
+  });
+
+  it("renders exactly the four agreed metrics for the current month", async () => {
     dataMocks.listRebates.mockResolvedValue([
       {
         id: "r1",
@@ -33,9 +47,6 @@ describe("HomePage", () => {
         updated_at: "2026-08-01T00:00:00Z",
       },
     ]);
-    dataMocks.listShippingEvents.mockResolvedValue([]);
-    dataMocks.listShippingEventItems.mockResolvedValue([]);
-
     render(
       <HomePage
         dataSource={dataSource}
@@ -65,10 +76,6 @@ describe("HomePage", () => {
 
   it("exits placeholder state and provides retry after a data error", async () => {
     dataMocks.listUnits.mockRejectedValue(new Error("读取数据库超时"));
-    dataMocks.listSales.mockResolvedValue([]);
-    dataMocks.listRebates.mockResolvedValue([]);
-    dataMocks.listShippingEvents.mockResolvedValue([]);
-    dataMocks.listShippingEventItems.mockResolvedValue([]);
 
     render(
       <HomePage
@@ -82,5 +89,26 @@ describe("HomePage", () => {
       screen.getByRole("button", { name: "重试加载" }),
     ).toBeInTheDocument();
     expect(screen.queryByText("…")).not.toBeInTheDocument();
+  });
+
+  it("does not load, display or count rebates for a bulk account", async () => {
+    dataMocks.getAccountPreferences.mockResolvedValue({
+      user_id: "friend",
+      workflow: "bulk",
+      updated_at: "2026-08-01T00:00:00Z",
+    });
+
+    render(
+      <HomePage
+        dataSource={dataSource}
+        now={new Date("2026-08-04T12:00:00+02:00")}
+      />,
+    );
+
+    expect(await screen.findByText("按实际到账减进价和运费")).toBeInTheDocument();
+    expect(screen.queryByText(/返利/)).not.toBeInTheDocument();
+    expect(screen.getByText("本月暂无已结算销售；完成结算后将显示利润。"))
+      .toBeInTheDocument();
+    expect(dataMocks.listRebates).not.toHaveBeenCalled();
   });
 });

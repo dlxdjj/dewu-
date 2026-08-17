@@ -42,6 +42,7 @@ export interface ReportInput {
   shippingEvents: ShippingEvent[];
   shippingEventItems: ShippingEventItem[];
   month: string;
+  includeRebates?: boolean;
 }
 
 function summarize(
@@ -89,10 +90,11 @@ export function buildSettlementReport(input: ReportInput): SettlementReport {
   const rows = allRows.filter((row) =>
     row.sale.settled_at?.startsWith(input.month),
   );
-  const rebates = input.rebates.filter((rebate) =>
+  const includedRebates = input.includeRebates === false ? [] : input.rebates;
+  const rebates = includedRebates.filter((rebate) =>
     rebate.month.startsWith(input.month),
   );
-  const allRebateCents = input.rebates.reduce(
+  const allRebateCents = includedRebates.reduce(
     (sum, rebate) => sum + rebate.amount_cents,
     0,
   );
@@ -124,7 +126,11 @@ export function buildSettlementReport(input: ReportInput): SettlementReport {
   };
 }
 
-export function buildCsv(report: SettlementReport, month: string): string {
+export function buildCsv(
+  report: SettlementReport,
+  month: string,
+  options: { includeRebates?: boolean } = {},
+): string {
   const detailHeader = [
     "品名",
     "尺码",
@@ -147,24 +153,36 @@ export function buildCsv(report: SettlementReport, month: string): string {
       .map(csv)
       .join(","),
   );
+  const includeRebates = options.includeRebates !== false;
+  const summaryHeader = includeRebates
+    ? "范围,利润(分),返利收入(分),运费支出(分),销售额(分),销量"
+    : "范围,利润(分),运费支出(分),销售额(分),销量";
+  const summaryRow = (label: string, summary: SettlementSummary) =>
+    includeRebates
+      ? `${label},${summary.profitCents},${summary.rebateCents},${summary.shippingCents},${summary.salesCents},${summary.salesCount}`
+      : `${label},${summary.profitCents},${summary.shippingCents},${summary.salesCents},${summary.salesCount}`;
   const lines = [
-    "范围,利润(分),返利收入(分),运费支出(分),销售额(分),销量",
-    `历史累计,${report.allTime.profitCents},${report.allTime.rebateCents},${report.allTime.shippingCents},${report.allTime.salesCents},${report.allTime.salesCount}`,
-    `${month},${report.selectedMonth.profitCents},${report.selectedMonth.rebateCents},${report.selectedMonth.shippingCents},${report.selectedMonth.salesCents},${report.selectedMonth.salesCount}`,
+    summaryHeader,
+    summaryRow("历史累计", report.allTime),
+    summaryRow(month, report.selectedMonth),
     "",
     detailHeader.join(","),
     ...details,
-    "",
-    "返利来源,月份,金额(分)",
-    ...report.rebates.map((rebate) =>
-      [
-        REBATE_SOURCE_LABELS[rebate.source],
-        rebate.month.slice(0, 7),
-        rebate.amount_cents,
-      ]
-        .map(csv)
-        .join(","),
-    ),
+    ...(includeRebates
+      ? [
+          "",
+          "返利来源,月份,金额(分)",
+          ...report.rebates.map((rebate) =>
+            [
+              REBATE_SOURCE_LABELS[rebate.source],
+              rebate.month.slice(0, 7),
+              rebate.amount_cents,
+            ]
+              .map(csv)
+              .join(","),
+          ),
+        ]
+      : []),
   ];
   return `\uFEFF${lines.join("\n")}`;
 }
