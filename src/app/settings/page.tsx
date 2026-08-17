@@ -70,14 +70,6 @@ export default function SettingsPage() {
             {dbKind() === "supabase" ? "Supabase 已连接" : "Supabase 未配置"}
           </p>
           <p className="text-muted">账户：{email || "加载中…"}</p>
-          <p className="text-muted">
-            账号类型：
-            {shared?.data
-              ? bulk
-                ? "朋友账号（表格导入）"
-                : "我的账号（完整功能）"
-              : "加载中…"}
-          </p>
           <button
             type="button"
             onClick={async () => {

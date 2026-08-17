@@ -23,6 +23,7 @@ describe("SettingsPage", () => {
       ),
     ).toBeInTheDocument();
     expect(screen.queryByText(/ACID/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/账号类型/)).not.toBeInTheDocument();
 
     const clearButton = screen.getByRole("button", {
       name: "确认清空全部数据",
