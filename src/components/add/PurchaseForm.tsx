@@ -220,7 +220,7 @@ export default function PurchaseForm({
   }
 
   return (
-    <div className="mx-auto w-full max-w-xl">
+    <div className="purchase-shell mx-auto w-full max-w-xl">
       {showHeader && (
         <PageHeader
           title="添加"
@@ -231,12 +231,22 @@ export default function PurchaseForm({
       )}
       <Link
         href="/add/ocr"
-        className="mb-4 block rounded-full bg-label py-3.5 text-center text-sm font-medium text-card shadow-[var(--cirrus-shadow-2)]"
+        className="scan-entry mb-4 block rounded-full bg-label py-3.5 text-center text-sm font-medium text-card shadow-[var(--cirrus-shadow-2)]"
       >
         拍照识别订单截图（需人工确认）
       </Link>
       <form onSubmit={submit}>
-        <Card className="min-w-0 space-y-4 overflow-hidden">
+        <Card className="purchase-image-panel mb-4 p-4">
+          <ImagePicker
+            label={existingImage ? "选择新图片替换" : "添加商品图片"}
+            value={image}
+            onChange={setImage}
+          />
+          <p className="mt-2 text-center text-xs leading-5 text-muted">
+            直接上传截图，系统会自动检查并裁去上下黑边
+          </p>
+        </Card>
+        <Card className="purchase-form-card min-w-0 space-y-4 overflow-hidden">
           <label className="block min-w-0 text-sm">
             品名（必填）
             <input
@@ -376,11 +386,6 @@ export default function PurchaseForm({
               </p>
             </div>
           )}
-          <ImagePicker
-            label={existingImage ? "选择新图片替换" : "添加商品图片"}
-            value={image}
-            onChange={setImage}
-          />
         </Card>
         {error && (
           <p role="alert" aria-live="polite" className="mt-3 text-center text-sm text-danger">
@@ -409,7 +414,7 @@ export default function PurchaseForm({
           <button
             type="submit"
             disabled={saving}
-            className="mt-4 w-full rounded-full bg-tint py-3.5 font-medium text-white shadow-[var(--cirrus-shadow-2)] disabled:opacity-40"
+            className="primary-action mt-4 w-full rounded-full bg-tint py-3.5 font-medium text-white shadow-[var(--cirrus-shadow-2)] disabled:opacity-40"
           >
             {saving
               ? "保存中…"

@@ -90,8 +90,12 @@ export default function HomePage({
     : data;
 
   return (
-    <>
-      <PageHeader title="首页" subtitle="极简进销存" />
+    <div className="home-page">
+      <PageHeader title="首页" />
+      <div className="home-quick-actions" aria-label="首页快捷操作">
+        <Link href="/inventory" className="home-quick-primary">查看库存</Link>
+        <Link href="/reports" className="home-quick-secondary">本月报表</Link>
+      </div>
       {error ? (
         <Card>
           <p role="alert" className="text-sm text-danger">
@@ -106,21 +110,32 @@ export default function HomePage({
           </button>
         </Card>
       ) : (
-        <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+        <section className="home-overview" aria-label="经营概览">
+          <div className="home-overview-head">
+            <div>
+              <p className="home-overview-kicker">{displayed?.monthLabel ?? monthLabel}经营概览</p>
+              <h2>本月经营结果</h2>
+            </div>
+            <span className="home-live-badge">LIVE</span>
+          </div>
+          <div className="home-stat-grid">
           <Stat
             label="库存数量"
             value={displayed ? String(displayed.inventoryCount) : "…"}
             hint="件"
+            className="home-stat home-stat-inventory"
           />
           <Stat
             label="库存成本"
             value={displayed ? formatCents(displayed.inventoryCostCents) : "…"}
             hint="按单件进价"
+            className="home-stat home-stat-cost"
           />
           <Stat
             label={`${displayed?.monthLabel ?? monthLabel}销售额`}
             value={displayed ? formatCents(displayed.monthlySalesCents) : "…"}
             hint={displayed ? `已结算 ${displayed.monthlySalesCount} 件` : "按实际到账"}
+            className="home-stat home-stat-sales"
           />
           <Stat
             label={`${displayed?.monthLabel ?? monthLabel}利润`}
@@ -131,7 +146,9 @@ export default function HomePage({
                 : "含返利收入"
             }
             featured
+            className="home-stat home-stat-profit"
           />
+          </div>
           {displayed?.monthlySalesCount === 0 && (
             <p
               role="status"
@@ -142,7 +159,7 @@ export default function HomePage({
                 : "本月暂无已结算销售；完成结算或录入返利后将显示利润。"}
             </p>
           )}
-          <Card className="col-span-2 md:col-span-4">
+          <Card className="home-cashflow">
             <div className="flex items-center justify-between gap-4">
               <div>
                 <p className="text-[13px] text-muted">{displayed?.monthLabel ?? monthLabel}经营收支</p>
@@ -159,15 +176,19 @@ export default function HomePage({
               </p>
             </div>
           </Card>
-        </div>
+        </section>
       )}
+      {displayed && <StatusSignal summary={displayed} />}
       {displayed && (
-        <section aria-label="待办事项" className="mt-5">
-          <div className="mb-2 flex items-center justify-between">
-            <h2 className="font-semibold">待办事项</h2>
-            <Link href="/inventory" className="text-sm text-tint">查看库存</Link>
+        <section aria-label="待办事项" className="home-todos mt-5">
+          <div className="home-section-head mb-2 flex items-center justify-between">
+            <div>
+              <p className="home-section-kicker">NEXT ACTIONS</p>
+              <h2 className="font-semibold">待办事项</h2>
+            </div>
+            <Link href="/inventory" className="text-sm text-tint">查看全部 →</Link>
           </div>
-          <div className="grid grid-cols-2 gap-2 md:grid-cols-3">
+          <div className="home-todo-grid">
             {[
               ["未到货", displayed.todoCounts.pending, "/inventory?view=active&status=pending"],
               ["已到货", displayed.todoCounts.arrived, "/inventory?view=active&status=arrived"],
@@ -179,15 +200,58 @@ export default function HomePage({
               <Link
                 key={String(label)}
                 href={String(href)}
-                className="flex min-h-16 items-center justify-between rounded-[28px] border border-separator bg-card px-4 shadow-[var(--cirrus-shadow-1)] active:bg-background"
+                className="home-todo-item"
               >
-                <span className="text-sm text-muted">{label}</span>
-                <span className="text-xl font-semibold tabular-nums">{count}</span>
+                <span className="home-todo-copy"><b>{label}</b><small>点击查看并处理</small></span>
+                <span className="home-todo-count">{String(count).padStart(2, "0")}</span>
               </Link>
             ))}
           </div>
         </section>
       )}
-    </>
+    </div>
+  );
+}
+
+function StatusSignal({ summary }: { summary: HomeSummary }) {
+  const items = [
+    { label: "得物仓未售 ·", count: summary.todoCounts.in_stock_dewu, tone: "stock" },
+    { label: "运输途中 ·", count: summary.todoCounts.shipping, tone: "shipping" },
+    { label: "已到货 ·", count: summary.todoCounts.arrived, tone: "arrived" },
+    { label: "未到货 ·", count: summary.todoCounts.pending, tone: "pending" },
+  ];
+  const total = Math.max(1, items.reduce((sum, item) => sum + item.count, 0));
+
+  return (
+    <section className="home-signal" aria-label="库存状态分布">
+      <div className="home-section-head">
+        <div>
+          <p className="home-section-kicker">INVENTORY SIGNAL</p>
+          <h2>库存状态</h2>
+        </div>
+        <span>{summary.inventoryCount} 件当前库存</span>
+      </div>
+      <Card className="home-signal-card">
+        <div className="home-signal-bar" aria-hidden="true">
+          {items.map((item) => (
+            item.count > 0 && (
+              <span
+                key={item.tone}
+                data-tone={item.tone}
+                style={{ flexGrow: item.count / total }}
+              />
+            )
+          ))}
+        </div>
+        <div className="home-signal-legend">
+          {items.map((item) => (
+            <div key={item.tone}>
+              <span><i data-tone={item.tone} />{item.label}</span>
+              <b>{Math.round((item.count / total) * 100)}%</b>
+            </div>
+          ))}
+        </div>
+      </Card>
+    </section>
   );
 }

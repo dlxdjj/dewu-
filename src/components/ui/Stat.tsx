@@ -6,12 +6,14 @@ export default function Stat({
   hint,
   compact = false,
   featured = false,
+  className = "",
 }: {
   label: string;
   value: string;
   hint?: string;
   compact?: boolean;
   featured?: boolean;
+  className?: string;
 }) {
   const compactValueSize =
     value.length >= 11
@@ -26,11 +28,11 @@ export default function Stat({
         compact
           ? "min-w-0 overflow-hidden px-3 py-4 text-center"
           : "min-w-0 overflow-hidden"
-      }`}
+      } theme-stat ${featured ? "theme-stat-featured" : ""} ${compact ? "theme-stat-compact" : ""} ${className}`}
     >
-      <p className={`truncate text-[13px] ${featured ? "text-card/70" : "text-muted"}`}>{label}</p>
+      <p className={`theme-stat-label truncate text-[13px] ${featured ? "text-card/70" : "text-muted"}`}>{label}</p>
       <p
-        className={`mt-1 whitespace-nowrap font-semibold leading-none tabular-nums ${
+        className={`theme-stat-value mt-1 whitespace-nowrap font-semibold leading-none tabular-nums ${
           compact
             ? `${compactValueSize} tracking-[-0.035em]`
             : "text-[24px]"
@@ -39,7 +41,7 @@ export default function Stat({
         {value}
       </p>
       {hint && (
-        <p className={`mt-1.5 truncate text-[11px] ${featured ? "text-card/70" : "text-muted"}`}>{hint}</p>
+        <p className={`theme-stat-hint mt-1.5 truncate text-[11px] ${featured ? "text-card/70" : "text-muted"}`}>{hint}</p>
       )}
     </Card>
   );

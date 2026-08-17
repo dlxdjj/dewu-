@@ -16,16 +16,16 @@ export default function ThemePicker() {
     <fieldset>
       <legend className="font-medium">外观主题</legend>
       <p className="mt-1 text-xs leading-5 text-muted">
-        只改变颜色、圆角和阴影，不改变页面功能与数据。
+        每套主题都有独立排版、字体与组件规则，功能和数据保持一致。
       </p>
-      <div className="mt-3 grid grid-cols-2 gap-2">
+      <div className="theme-picker-grid mt-3 grid grid-cols-2 gap-2">
         {APP_THEMES.map((theme) => (
           <button
             key={theme.value}
             type="button"
             aria-pressed={selected === theme.value}
             onClick={() => saveTheme(theme.value)}
-            className={`min-h-24 rounded-xl border p-3 text-left transition-colors ${
+            className={`theme-picker-option min-h-24 rounded-xl border p-3 text-left transition-colors ${
               selected === theme.value
                 ? "border-tint ring-2 ring-tint"
                 : "border-separator"

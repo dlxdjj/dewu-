@@ -86,7 +86,7 @@ export default function SpreadsheetImport({
   }
 
   return (
-    <Card className="mb-4 min-w-0 overflow-hidden">
+    <Card className="spreadsheet-import mb-4 min-w-0 overflow-hidden">
       <h2 className="font-medium">Excel 批量导入</h2>
       <p className="mt-1 text-xs leading-5 text-muted">
         A–D 为货号、货品名称、数量、进价；E 列尺码可选。导入后默认状态为已到货。

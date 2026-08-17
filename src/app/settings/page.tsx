@@ -58,9 +58,9 @@ export default function SettingsPage() {
   }
 
   return (
-    <>
+    <div className="settings-page">
       <PageHeader title="设置" subtitle="账户、数据维护与危险操作" />
-      <div className="grid gap-3 md:grid-cols-2">
+      <div className="settings-grid grid gap-3 md:grid-cols-2">
         <Card className="space-y-2 text-sm">
           <h2 className="font-medium">账户与数据源</h2>
           <p>
@@ -133,6 +133,6 @@ export default function SettingsPage() {
           {message}
         </p>
       )}
-    </>
+    </div>
   );
 }

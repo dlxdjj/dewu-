@@ -153,6 +153,7 @@ export default function InventoryPage({
   }, [bulk, missingSizeOnly, platformFilter, query, statusFilter, units, view]);
 
   const groups = buildGroups(visibleUnits);
+  const visibleCostCents = visibleUnits.reduce((sum, unit) => sum + unit.unit_cost_cents, 0);
   const availablePlatforms = PLATFORMS.filter((option) =>
     !bulk && units.some((unit) => unit.batch.platform === option.value),
   );
@@ -210,28 +211,28 @@ export default function InventoryPage({
   }
 
   return (
-    <>
-      <div className="flex items-start justify-between gap-3">
+    <div className="inventory-page">
+      <div className="inventory-page-head flex items-start justify-between gap-3">
         <PageHeader title="库存" subtitle={loading ? "加载中…" : `${visibleUnits.length} 件 · ${groups.length} 款`} />
         {canBatch && units.length > 0 && (
           <button
             type="button"
             onClick={() => selecting ? resetSelection() : setSelecting(true)}
-            className="min-h-11 shrink-0 rounded-full border border-separator bg-card px-4 text-[15px] shadow-[var(--cirrus-shadow-1)]"
+            className="inventory-batch-button min-h-11 shrink-0 rounded-full border border-separator bg-card px-4 text-[15px] shadow-[var(--cirrus-shadow-1)]"
           >
             {selecting ? "退出批量" : "批量操作"}
           </button>
         )}
       </div>
 
-      <nav aria-label="库存分类" className="no-scrollbar mb-4 flex gap-1 overflow-x-auto rounded-full border border-separator bg-card p-1 shadow-[var(--cirrus-shadow-1)]">
+      <nav aria-label="库存分类" className="inventory-tabs no-scrollbar mb-4 flex gap-1 overflow-x-auto rounded-full border border-separator bg-card p-1 shadow-[var(--cirrus-shadow-1)]">
         {VIEWS.map((item) => (
           <button
             key={item.value}
             type="button"
             aria-pressed={view === item.value}
             onClick={() => switchView(item.value)}
-            className={`min-h-11 shrink-0 rounded-full px-4 text-[15px] transition-colors ${
+            className={`inventory-tab min-h-11 shrink-0 rounded-full px-4 text-[15px] transition-colors ${
               view === item.value ? "bg-label text-card shadow-[var(--cirrus-shadow-2)]" : "text-muted"
             }`}
           >
@@ -240,8 +241,20 @@ export default function InventoryPage({
         ))}
       </nav>
 
+      <section className="inventory-command" aria-label="库存摘要">
+        <div>
+          <span>INVENTORY VALUE</span>
+          <strong>{loading ? "…" : `¥${(visibleCostCents / 100).toLocaleString("zh-CN", { minimumFractionDigits: 2 })}`}</strong>
+          <small>{VIEWS.find((item) => item.value === view)?.label}</small>
+        </div>
+        <div className="inventory-command-side">
+          <b>{loading ? "…" : visibleUnits.length}</b>
+          <span>件 · {loading ? "…" : groups.length} 款</span>
+        </div>
+      </section>
+
       {!loading && units.length > 0 && (
-        <div className="mb-3 flex gap-2">
+        <div className="inventory-tools mb-3 flex gap-2">
           <label className="relative min-w-0 flex-1">
             <span className="sr-only">搜索库存</span>
             <input
@@ -250,13 +263,13 @@ export default function InventoryPage({
               value={query}
               onChange={(event) => setQuery(event.target.value)}
               placeholder="搜索品名、货号、尺码、订单号"
-              className="min-h-12 w-full min-w-0 rounded-full border border-separator bg-card px-4 text-base shadow-[var(--cirrus-shadow-1)] outline-none placeholder:text-muted"
+              className="inventory-search min-h-12 w-full min-w-0 rounded-full border border-separator bg-card px-4 text-base shadow-[var(--cirrus-shadow-1)] outline-none placeholder:text-muted"
             />
           </label>
           <button
             type="button"
             onClick={() => setFilterOpen(true)}
-            className="min-h-12 shrink-0 rounded-full border border-separator bg-card px-4 text-[15px] shadow-[var(--cirrus-shadow-1)]"
+            className="inventory-filter-button min-h-12 shrink-0 rounded-full border border-separator bg-card px-4 text-[15px] shadow-[var(--cirrus-shadow-1)]"
           >
             筛选{activeFilterCount ? ` ${activeFilterCount}` : ""}
           </button>
@@ -296,7 +309,7 @@ export default function InventoryPage({
       ) : groups.length === 0 ? (
         <Card><EmptyState title="没有匹配结果" subtitle="尝试清空搜索或调整筛选条件" /></Card>
       ) : (
-        <div className="grid min-w-0 gap-3 md:grid-cols-2">
+        <div className="inventory-product-grid grid min-w-0 gap-3 md:grid-cols-2">
           {groups.map((group) => (
             <GroupCard
               key={group.key}
@@ -398,7 +411,7 @@ export default function InventoryPage({
         />
       )}
       {settlementUnits && <SaleFormSheet units={settlementUnits} dataSource={dataSource} onClose={() => setSettlementUnits(null)} onDone={done} />}
-    </>
+    </div>
   );
 }
 
