@@ -67,8 +67,8 @@ export default function GroupCard({
           <p className="min-w-0 truncate text-base font-semibold leading-6">
             {group.product.name}
           </p>
-          <span className="shrink-0 rounded-full bg-label px-2.5 py-1 text-sm font-semibold text-card shadow-[var(--cirrus-shadow-2)]">
-            ×{group.units.length}
+          <span className="inventory-quantity-badge shrink-0 rounded-full px-2.5 py-1 text-sm font-semibold">
+            数量 {group.units.length}
           </span>
         </div>
         <p className="mt-0.5 truncate text-sm leading-5 text-muted">
@@ -131,7 +131,7 @@ export default function GroupCard({
           <button
             type="button"
             onClick={() => onProcess(actionableUnits)}
-            className="min-h-11 w-full rounded-full bg-label px-3 text-[15px] font-medium text-card"
+            className="inventory-action-button min-h-[52px] w-full rounded-full px-3 text-[15px] font-semibold"
           >
             {workflowActionLabel(actionableUnits)}
           </button>

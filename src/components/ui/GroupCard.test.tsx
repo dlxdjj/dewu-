@@ -35,7 +35,7 @@ describe("GroupCard", () => {
       />,
     );
 
-    expect(screen.getByText("×2")).toBeInTheDocument();
+    expect(screen.getByText("数量 2")).toHaveClass("inventory-quantity-badge");
     expect(screen.getByText("成本合计 ¥3.00")).toBeInTheDocument();
     expect(screen.getByText("淘宝 · 拼多多")).toBeInTheDocument();
     expect(screen.getByText("已到货 1")).toBeInTheDocument();
@@ -93,9 +93,9 @@ describe("GroupCard", () => {
       />,
     );
 
-    await userEvent.click(
-      screen.getByRole("button", { name: "录入到手价 · 2 件" }),
-    );
+    const action = screen.getByRole("button", { name: "录入到手价 · 2 件" });
+    expect(action).toHaveClass("inventory-action-button", "min-h-[52px]");
+    await userEvent.click(action);
     expect(onProcess).toHaveBeenCalledWith(soldGroup.units);
   });
 });

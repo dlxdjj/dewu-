@@ -27,6 +27,12 @@
   --cirrus-signal: #2e7def;
   --cirrus-citrus: #ff7a3d;
   --cirrus-meadow: #2bc48a;
+  --cirrus-action-soft-bg: #e3f2ff;
+  --cirrus-action-soft-bg-active: #d8edff;
+  --cirrus-action-soft-border: #7db8e8;
+  --cirrus-action-soft-text: #0e61ad;
+  --cirrus-quantity-bg: #edf3f8;
+  --cirrus-quantity-text: #334f6d;
   --cirrus-display: "Avenir Next", "Helvetica Neue", "PingFang SC", sans-serif;
   --cirrus-shadow-1:
     0 1px 1px rgba(14, 17, 22, 0.04),
@@ -104,6 +110,30 @@ h3 {
 
 .ring-tint {
   --tw-ring-color: var(--cirrus-signal) !important;
+}
+
+/* 库存卡片的重复操作使用云海蓝，避免大面积纯黑压住商品信息。 */
+.inventory-action-button {
+  border: 1px solid var(--cirrus-action-soft-border);
+  background: var(--cirrus-action-soft-bg);
+  color: var(--cirrus-action-soft-text);
+  transition: background-color 150ms ease, transform 150ms ease;
+}
+
+.inventory-action-button:active {
+  background: var(--cirrus-action-soft-bg-active);
+  transform: translateY(1px);
+}
+
+.inventory-quantity-badge {
+  background: var(--cirrus-quantity-bg);
+  color: var(--cirrus-quantity-text);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .inventory-action-button {
+    transition: none;
+  }
 }
 
 .bg-card {

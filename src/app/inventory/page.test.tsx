@@ -11,7 +11,7 @@ describe("InventoryPage", () => {
       <InventoryPage dataSource={new MemoryDbAdapter(makeInventorySeed())} />,
     );
 
-    expect(await screen.findByText("×3")).toBeInTheDocument();
+    expect(await screen.findByText("数量 3")).toBeInTheDocument();
     await userEvent.click(screen.getByRole("button", { name: "筛选" }));
     expect(
       screen.getByRole("button", { name: "全部" }),
@@ -23,15 +23,15 @@ describe("InventoryPage", () => {
     ).not.toBeInTheDocument();
 
     await userEvent.click(screen.getByRole("button", { name: "淘宝" }));
-    expect(await screen.findByText("×2")).toBeInTheDocument();
-    expect(screen.queryByText("×3")).not.toBeInTheDocument();
+    expect(await screen.findByText("数量 2")).toBeInTheDocument();
+    expect(screen.queryByText("数量 3")).not.toBeInTheDocument();
   });
 
   it("filters merged inventory by an exact status", async () => {
     render(
       <InventoryPage dataSource={new MemoryDbAdapter(makeInventorySeed())} />,
     );
-    await screen.findByText("×3");
+    await screen.findByText("数量 3");
 
     await userEvent.click(screen.getByRole("button", { name: "筛选" }));
     await userEvent.click(
@@ -39,7 +39,7 @@ describe("InventoryPage", () => {
     );
     await userEvent.click(screen.getByRole("button", { name: "查看结果" }));
 
-    expect(await screen.findByText("×1")).toBeInTheDocument();
+    expect(await screen.findByText("数量 1")).toBeInTheDocument();
     expect(screen.getByText("1 件 · 1 款")).toBeInTheDocument();
     expect(screen.getByText("发往得物途中 1")).toBeInTheDocument();
   });
@@ -48,10 +48,10 @@ describe("InventoryPage", () => {
     render(
       <InventoryPage dataSource={new MemoryDbAdapter(makeInventorySeed())} />,
     );
-    await screen.findByText("×3");
+    await screen.findByText("数量 3");
 
     await userEvent.type(screen.getByRole("searchbox", { name: "搜索库存" }), "拼多多");
-    expect(await screen.findByText("×1")).toBeInTheDocument();
+    expect(await screen.findByText("数量 1")).toBeInTheDocument();
     expect(screen.getByText("1 件 · 1 款")).toBeInTheDocument();
   });
 
@@ -59,7 +59,7 @@ describe("InventoryPage", () => {
     render(
       <InventoryPage dataSource={new MemoryDbAdapter(makeInventorySeed())} />,
     );
-    await screen.findByText("×3");
+    await screen.findByText("数量 3");
 
     await userEvent.click(screen.getByRole("button", { name: "批量操作" }));
     await userEvent.click(
@@ -82,7 +82,7 @@ describe("InventoryPage", () => {
     seed.units!.forEach((unit) => { unit.status = "arrived"; });
     const db = new MemoryDbAdapter(seed);
     render(<InventoryPage dataSource={db} />);
-    await screen.findByText("×3");
+    await screen.findByText("数量 3");
     await userEvent.click(screen.getByRole("button", { name: "批量操作" }));
     await userEvent.click(
       screen.getByRole("button", { name: "选择 AB-1 42，共 3 件" }),
@@ -159,9 +159,9 @@ describe("InventoryPage", () => {
     seed.units![0].status = "refunded";
     const db = new MemoryDbAdapter(seed);
     render(<InventoryPage dataSource={db} />);
-    expect(await screen.findByText("×2")).toBeInTheDocument();
+    expect(await screen.findByText("数量 2")).toBeInTheDocument();
     await userEvent.click(screen.getByRole("button", { name: "退货退款 1" }));
-    expect(await screen.findByText("×1")).toBeInTheDocument();
+    expect(await screen.findByText("数量 1")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "批量操作" })).not.toBeInTheDocument();
   });
 
@@ -170,7 +170,7 @@ describe("InventoryPage", () => {
     seed.units![0].status = "sold";
     render(<InventoryPage dataSource={new MemoryDbAdapter(seed)} />);
     await userEvent.click(await screen.findByRole("button", { name: "待结算 1" }));
-    await screen.findByText("×1");
+    await screen.findByText("数量 1");
     await userEvent.click(screen.getByRole("button", { name: "批量操作" }));
     await userEvent.click(
       screen.getByRole("button", { name: "选择 AB-1 42，共 1 件" }),
