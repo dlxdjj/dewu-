@@ -88,7 +88,7 @@ export default function ReportsPage({
   const monthText = `${Number(month.slice(5))}月`;
 
   return (
-    <div className="reports-page">
+    <>
       <PageHeader title="报表" subtitle="已结算实际到账 + 返利收入" />
       {displayError ? (
         <Card>
@@ -97,8 +97,14 @@ export default function ReportsPage({
           </p>
         </Card>
       ) : (
-        <div className="reports-stack">
-          <label className="report-month mt-4 block min-w-0 text-sm">
+        <>
+          <SummarySection
+            ariaLabel="历史累计"
+            title="历史累计"
+            summary={report?.allTime ?? null}
+            lifetime
+          />
+          <label className="mt-4 block min-w-0 text-sm">
             月份
             <span className="date-input-shell date-input-shell-card mt-1">
               <input
@@ -110,11 +116,6 @@ export default function ReportsPage({
               />
             </span>
           </label>
-          <SummarySection
-            ariaLabel={`${monthText}统计`}
-            title={`${monthText}结算与返利`}
-            summary={report?.selectedMonth ?? null}
-          />
           {source && (
             <RebateEditor
               key={month}
@@ -139,22 +140,21 @@ export default function ReportsPage({
             />
           )}
           <SummarySection
-            ariaLabel="历史累计"
-            title="历史累计"
-            summary={report?.allTime ?? null}
-            lifetime
+            ariaLabel={`${monthText}统计`}
+            title={`${monthText}结算与返利`}
+            summary={report?.selectedMonth ?? null}
           />
           {report?.selectedMonth.salesCount === 0 && (
             <p
               role="status"
-              className="report-empty-notice mt-3 rounded-2xl bg-card px-4 py-3 text-sm leading-6 text-muted"
+              className="mt-3 rounded-2xl bg-card px-4 py-3 text-sm leading-6 text-muted"
             >
               {report.selectedMonth.rebateCents > 0
                 ? "本月暂无已结算记录；已录入的返利仍计入本月利润。"
                 : "本月暂无已结算记录；完成结算或录入返利后将显示利润。"}
             </p>
           )}
-        </div>
+        </>
       )}
       <button
         type="button"
@@ -172,11 +172,11 @@ export default function ReportsPage({
           anchor.click();
           URL.revokeObjectURL(url);
         }}
-        className="report-export mt-4 w-full rounded-full border border-separator bg-card py-3.5 font-medium text-tint shadow-[var(--cirrus-shadow-1)] disabled:opacity-40"
+        className="mt-4 w-full rounded-full border border-separator bg-card py-3.5 font-medium text-tint shadow-[var(--cirrus-shadow-1)] disabled:opacity-40"
       >
         导出 CSV
       </button>
-    </div>
+    </>
   );
 }
 
@@ -226,7 +226,7 @@ function RebateEditor({
   }
 
   return (
-    <Card className="rebate-editor mt-4">
+    <Card className="mt-4">
       <h2 className="font-semibold">本月返利</h2>
       <p className="mt-1 text-sm leading-5 text-muted">
         返利只增加利润，不增加销售额或销量。
@@ -294,9 +294,9 @@ function SummarySection({
   lifetime?: boolean;
 }) {
   return (
-    <section aria-label={ariaLabel} className={`report-summary mt-3 ${lifetime ? "report-summary-lifetime" : "report-summary-month"}`}>
-      <h2 className="report-summary-title mb-2 text-sm font-medium text-muted">{title}</h2>
-      <div className="report-stat-grid grid grid-cols-2 gap-2 md:grid-cols-4">
+    <section aria-label={ariaLabel} className="mt-3">
+      <h2 className="mb-2 text-sm font-medium text-muted">{title}</h2>
+      <div className="grid grid-cols-2 gap-2 md:grid-cols-4">
         <Stat
           label={lifetime ? "总利润" : "利润"}
           value={summary ? formatCents(summary.profitCents) : "…"}
@@ -304,27 +304,22 @@ function SummarySection({
             summary ? `含返利 ${formatCents(summary.rebateCents)}` : undefined
           }
           compact
-          featured={!lifetime}
-          className="report-stat report-stat-profit"
         />
         <Stat
           label={lifetime ? "总运费" : "运费"}
           value={summary ? formatCents(summary.shippingCents) : "…"}
           hint="按寄出日期"
           compact
-          className="report-stat report-stat-shipping"
         />
         <Stat
           label={lifetime ? "总销售额" : "销售额"}
           value={summary ? formatCents(summary.salesCents) : "…"}
           compact
-          className="report-stat report-stat-sales"
         />
         <Stat
           label={lifetime ? "总销量" : "销量"}
           value={summary ? String(summary.salesCount) : "…"}
           compact
-          className="report-stat report-stat-volume"
         />
       </div>
     </section>

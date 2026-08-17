@@ -22,9 +22,9 @@ export default function Sheet({
         onClick={onClose}
         aria-hidden
       />
-      <div className="theme-sheet relative max-h-[88dvh] w-[calc(100%_-_1rem)] max-w-lg overflow-y-auto rounded-t-[28px] border border-b-0 border-separator bg-card px-5 pb-[calc(20px+env(safe-area-inset-bottom))] pt-3 shadow-[var(--cirrus-shadow-2)]">
-        <div className="theme-sheet-handle mx-auto mb-3 h-1 w-10 rounded-full bg-separator" />
-        <h3 className="theme-sheet-title mb-4 text-center text-[18px] font-semibold tracking-[-0.02em]">{title}</h3>
+      <div className="relative max-h-[88dvh] w-[calc(100%_-_1rem)] max-w-lg overflow-y-auto rounded-t-[28px] border border-b-0 border-separator bg-card px-5 pb-[calc(20px+env(safe-area-inset-bottom))] pt-3 shadow-[var(--cirrus-shadow-2)]">
+        <div className="mx-auto mb-3 h-1 w-10 rounded-full bg-separator" />
+        <h3 className="mb-4 text-center text-[18px] font-semibold tracking-[-0.02em]">{title}</h3>
         {children}
       </div>
     </div>

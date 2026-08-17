@@ -74,12 +74,12 @@ export default function ImagePicker({
   }
 
   return (
-    <div className="image-picker">
+    <div>
       <button
         type="button"
         disabled={processing}
         onClick={() => inputRef.current?.click()}
-        className={`image-picker-button relative flex w-full items-center justify-center overflow-hidden rounded-[22px] border border-dashed border-separator bg-background text-muted shadow-inner active:bg-separator/40 disabled:opacity-60 ${
+        className={`relative flex w-full items-center justify-center overflow-hidden rounded-[22px] border border-dashed border-separator bg-background text-muted shadow-inner active:bg-separator/40 disabled:opacity-60 ${
           preview ? "h-44" : "h-24"
         }`}
       >

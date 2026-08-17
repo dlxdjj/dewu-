@@ -55,9 +55,6 @@ export default function DataSourceGate({
   children: React.ReactNode;
 }) {
   const navigation = useDefaultNavigation();
-  if (process.env.NODE_ENV === "development" && navigation.pathname === "/theme-qa") {
-    return children;
-  }
   return (
     <DataSourceGateController navigation={navigation}>
       {children}
