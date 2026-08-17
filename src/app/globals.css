@@ -64,7 +64,8 @@ body {
   position: relative;
   isolation: isolate;
   min-height: 100dvh;
-  background: var(--app-body-background);
+  /* iOS standalone PWA paints the status-bar safe area from the body canvas. */
+  background: var(--app-status-background);
   color: var(--color-label);
   font-family: var(--font-sans);
   font-variant-numeric: tabular-nums;

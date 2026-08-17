@@ -67,6 +67,15 @@ test("390px no-session page does not overflow", async ({ page }) => {
     scroll: document.documentElement.scrollWidth,
   }));
   expect(width.scroll).toBeLessThanOrEqual(width.client);
+
+  const safeAreaBackgrounds = await page.evaluate(() => ({
+    html: getComputedStyle(document.documentElement).backgroundColor,
+    body: getComputedStyle(document.body).backgroundColor,
+  }));
+  expect(safeAreaBackgrounds).toEqual({
+    html: "rgb(184, 212, 241)",
+    body: "rgb(184, 212, 241)",
+  });
 });
 
 test("390px settings keeps the original Cirrus theme only", async ({
