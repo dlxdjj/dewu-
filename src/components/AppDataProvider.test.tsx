@@ -27,6 +27,14 @@ function Probe() {
   return <p>{shared?.data?.preferences.user_id ?? "无账户数据"}</p>;
 }
 
+function deferred<T>() {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>((done) => {
+    resolve = done;
+  });
+  return { promise, resolve };
+}
+
 describe("AppDataProvider account switching", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -77,5 +85,40 @@ describe("AppDataProvider account switching", () => {
 
     expect(await screen.findByText("friend")).toBeInTheDocument();
     expect(db.listRebates).toHaveBeenCalledTimes(1);
+  });
+
+  it("shows the friend welcome only while a bulk account loads its first snapshot", async () => {
+    const units = deferred<[]>();
+    const db = {
+      getAccountPreferences: vi.fn(() => Promise.resolve({
+        user_id: "friend",
+        workflow: "bulk" as const,
+        updated_at: "2026-08-17T00:00:00Z",
+      })),
+      listUnits: vi.fn(() => units.promise),
+      listProducts: vi.fn(() => Promise.resolve([])),
+      listBatches: vi.fn(() => Promise.resolve([])),
+      listSales: vi.fn(() => Promise.resolve([])),
+      listRebates: vi.fn(() => Promise.resolve([])),
+      listShippingEvents: vi.fn(() => Promise.resolve([])),
+      listShippingEventItems: vi.fn(() => Promise.resolve([])),
+    };
+    mocks.getDb.mockReturnValue(db);
+    mocks.onAuthSessionChange.mockReturnValue(vi.fn());
+
+    render(
+      <AppDataProvider>
+        <Probe />
+      </AppDataProvider>,
+    );
+
+    expect(await screen.findByText("欢迎孙老板")).toBeInTheDocument();
+    expect(screen.getByText("孙老板发大财")).toBeInTheDocument();
+    expect(screen.queryByText("无账户数据")).not.toBeInTheDocument();
+
+    act(() => units.resolve([]));
+    expect(await screen.findByText("friend")).toBeInTheDocument();
+    expect(screen.queryByText("欢迎孙老板")).not.toBeInTheDocument();
+    expect(db.listRebates).not.toHaveBeenCalled();
   });
 });

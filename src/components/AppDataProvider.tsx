@@ -15,6 +15,7 @@ import type {
   Sale,
   ShippingEvent,
   ShippingEventItem,
+  AccountWorkflow,
 } from "@/lib/types/database";
 
 export interface AppDataSnapshot {
@@ -43,6 +44,7 @@ export default function AppDataProvider({ children }: { children: React.ReactNod
   const [data, setData] = useState<AppDataSnapshot | null>(null);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
+  const [loadingWorkflow, setLoadingWorkflow] = useState<AccountWorkflow | null>(null);
   const activeUserId = useRef<string | null>(null);
   const loadVersion = useRef(0);
 
@@ -60,6 +62,8 @@ export default function AppDataProvider({ children }: { children: React.ReactNod
       const shippingEventsPromise = db.listShippingEvents();
       const shippingEventItemsPromise = db.listShippingEventItems();
       const preferences = await preferencesPromise;
+      if (version !== loadVersion.current) return;
+      setLoadingWorkflow(preferences.workflow);
       const [units, products, batches, sales, rebates, shippingEvents, shippingEventItems] = await Promise.all([
         unitsPromise,
         productsPromise,
@@ -98,12 +102,32 @@ export default function AppDataProvider({ children }: { children: React.ReactNod
     activeUserId.current = nextUserId;
     setData(null);
     setError("");
+    setLoadingWorkflow(null);
     setLoading(Boolean(nextUserId && shouldLoad));
     if (nextUserId && shouldLoad) void refresh();
   }), [refresh, shouldLoad]);
 
   const value = useMemo(() => ({ data, error, loading, refresh }), [data, error, loading, refresh]);
-  return <AppDataContext.Provider value={value}>{children}</AppDataContext.Provider>;
+  const showFriendWelcome = shouldLoad && loading && !data && loadingWorkflow === "bulk";
+
+  return (
+    <AppDataContext.Provider value={value}>
+      {showFriendWelcome ? <FriendAccountWelcome /> : children}
+    </AppDataContext.Provider>
+  );
+}
+
+function FriendAccountWelcome() {
+  return (
+    <div
+      role="status"
+      aria-live="polite"
+      className="mx-auto mt-20 max-w-sm rounded-[28px] border border-separator bg-card p-6 text-center shadow-[var(--cirrus-shadow-2)]"
+    >
+      <h1 className="text-lg font-semibold">欢迎孙老板</h1>
+      <p className="mt-2 text-sm leading-6 text-muted">孙老板发大财</p>
+    </div>
+  );
 }
 
 export function useAppData(): AppDataContextValue | null {
