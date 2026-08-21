@@ -213,7 +213,7 @@ test("390px product image picker crops screenshot bars and can restore the origi
         height: image.naturalHeight,
       })),
     )
-    .toEqual({ width: 400, height: 1000 });
+    .toEqual({ width: 288, height: 720 });
   expect(
     await page.evaluate(() => ({
       client: document.documentElement.clientWidth,
