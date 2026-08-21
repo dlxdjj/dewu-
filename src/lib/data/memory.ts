@@ -162,6 +162,18 @@ export class MemoryDbAdapter implements DbAdapter {
     );
   }
 
+  async listAttachmentsByOwnerIds(
+    ownerType: Attachment["owner_type"],
+    ownerIds: string[],
+  ) {
+    const wanted = new Set(ownerIds);
+    return clone(
+      this.state.attachments.filter(
+        (row) => row.owner_type === ownerType && wanted.has(row.owner_id),
+      ),
+    );
+  }
+
   async attachmentUrl(attachment: Attachment) {
     return `memory://${attachment.path}`;
   }

@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Card from "@/components/ui/Card";
 import EmptyState from "@/components/ui/EmptyState";
 import GroupCard from "@/components/ui/GroupCard";
@@ -53,6 +53,9 @@ export default function InventoryPage({
   const [selecting, setSelecting] = useState(false);
   const [selected, setSelected] = useState(new Set<string>());
   const [workflowUnits, setWorkflowUnits] = useState<UnitJoined[] | null>(null);
+  const imageUrlsRef = useRef<Map<string, string>>(new Map());
+  const pendingImageIdsRef = useRef(new Set<string>());
+  const mountedRef = useRef(true);
   const shared = useAppData();
   const bulk = !dataSource && shared?.data?.preferences.workflow === "bulk";
 
@@ -82,12 +85,6 @@ export default function InventoryPage({
           : [];
       });
       setUnits(joined);
-      // Show cached inventory immediately; signed thumbnails can arrive afterward.
-      setLoading(false);
-      setImageUrls(await loadProductImageUrls(
-        db,
-        [...new Map(joined.map((unit) => [unit.product.id, unit.product])).values()],
-      ));
     } catch (reason) {
       setLoadError(reason instanceof Error ? reason.message : "加载失败");
     } finally {
@@ -112,6 +109,13 @@ export default function InventoryPage({
   useEffect(() => {
     void Promise.resolve().then(load);
   }, [load]);
+
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+    };
+  }, []);
 
   const viewCounts = useMemo(() => ({
     active: units.filter((unit) => ACTIVE_STATUSES.includes(unit.status)).length,
@@ -146,6 +150,43 @@ export default function InventoryPage({
   }, [bulk, missingSizeOnly, platformFilter, query, statusFilter, units, view]);
 
   const groups = buildGroups(visibleUnits);
+  const visibleProducts = useMemo(
+    () => [
+      ...new Map(
+        visibleUnits.map((unit) => [unit.product.id, unit.product]),
+      ).values(),
+    ],
+    [visibleUnits],
+  );
+  const visibleProductKey = useMemo(
+    () => visibleProducts
+      .map((product) => `${product.id}:${product.updated_at}`)
+      .join("|"),
+    [visibleProducts],
+  );
+
+  useEffect(() => {
+    const missing = visibleProducts.filter(
+      (product) =>
+        !imageUrlsRef.current.has(product.id) &&
+        !pendingImageIdsRef.current.has(product.id),
+    );
+    if (!missing.length) return;
+
+    for (const product of missing) pendingImageIdsRef.current.add(product.id);
+    const db = resolveDb();
+    void loadProductImageUrls(db, missing, (productId, url) => {
+      imageUrlsRef.current.set(productId, url);
+      pendingImageIdsRef.current.delete(productId);
+      if (mountedRef.current) {
+        setImageUrls(new Map(imageUrlsRef.current));
+      }
+    }).finally(() => {
+      for (const product of missing) {
+        pendingImageIdsRef.current.delete(product.id);
+      }
+    });
+  }, [resolveDb, visibleProductKey, visibleProducts]);
   const availablePlatforms = PLATFORMS.filter((option) =>
     !bulk && units.some((unit) => unit.batch.platform === option.value),
   );
@@ -281,11 +322,12 @@ export default function InventoryPage({
         <Card><EmptyState title="没有匹配结果" subtitle="尝试清空搜索或调整筛选条件" /></Card>
       ) : (
         <div className="grid min-w-0 gap-3 md:grid-cols-2">
-          {groups.map((group) => (
+          {groups.map((group, index) => (
             <GroupCard
               key={group.key}
               group={group}
               imageUrl={imageUrls.get(group.product.id) ?? null}
+              imagePriority={index < 3}
               platformFilter={platformFilter}
               selectable={selecting}
               selected={group.units.every((unit) => selected.has(unit.id))}

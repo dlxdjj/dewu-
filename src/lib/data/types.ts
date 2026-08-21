@@ -57,6 +57,7 @@ export interface DbAdapter {
   listShippingEvents(): Promise<ShippingEvent[]>;
   listShippingEventItems(): Promise<ShippingEventItem[]>;
   listAttachments(ownerType: AttachmentOwner, ownerId?: string): Promise<Attachment[]>;
+  listAttachmentsByOwnerIds?(ownerType: AttachmentOwner, ownerIds: string[]): Promise<Attachment[]>;
   attachmentUrl(attachment: Attachment): Promise<string>; saveAttachment(input: SaveAttachmentInput): Promise<Attachment>;
   catalogImageUrl(catalogProduct: CatalogProduct): Promise<string>;
   createPurchase(input: PurchaseInput): Promise<PurchaseResult>;

@@ -1,8 +1,8 @@
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { MemoryDbAdapter } from "@/lib/data/memory";
-import { makeInventorySeed } from "@/test/inventory-fixtures";
+import { makeInventorySeed, makeJoinedUnit } from "@/test/inventory-fixtures";
 import InventoryPage from "./page";
 
 describe("InventoryPage", () => {
@@ -205,5 +205,69 @@ describe("InventoryPage", () => {
       "src",
       "memory://product-image",
     );
+  });
+
+  it("does not request historical product images while showing current inventory", async () => {
+    const seed = makeInventorySeed();
+    const historical = makeJoinedUnit({
+      id: "history-unit",
+      productId: "history-product",
+      styleCode: "HISTORY-1",
+      status: "settled",
+    });
+    const historicalProduct = historical.product;
+    const historicalBatch = historical.batch;
+    const historicalUnit = {
+      id: historical.id,
+      user_id: historical.user_id,
+      product_id: historical.product_id,
+      batch_id: historical.batch_id,
+      size: historical.size,
+      unit_cost_cents: historical.unit_cost_cents,
+      listing_price_cents: historical.listing_price_cents,
+      outbound_shipping_cents: historical.outbound_shipping_cents,
+      status: historical.status,
+      created_at: historical.created_at,
+      updated_at: historical.updated_at,
+    };
+    historicalProduct.name = "历史商品";
+    seed.products!.push(historicalProduct);
+    seed.batches!.push(historicalBatch);
+    seed.units!.push(historicalUnit);
+    seed.attachments = [
+      {
+        id: "active-image",
+        user_id: "u1",
+        owner_type: "product",
+        owner_id: "p1",
+        kind: "product_image",
+        path: "active-image-path",
+        content_type: "image/jpeg",
+        created_at: "2026-08-03T00:00:00Z",
+      },
+      {
+        id: "history-image",
+        user_id: "u1",
+        owner_type: "product",
+        owner_id: "history-product",
+        kind: "product_image",
+        path: "history-image-path",
+        content_type: "image/jpeg",
+        created_at: "2026-08-03T00:00:00Z",
+      },
+    ];
+    const db = new MemoryDbAdapter(seed);
+    const attachmentUrl = vi.spyOn(db, "attachmentUrl");
+    const listVisibleAttachments = vi.spyOn(db, "listAttachmentsByOwnerIds");
+
+    render(<InventoryPage dataSource={db} />);
+
+    expect(await screen.findByRole("img", { name: "测试鞋" })).toHaveAttribute(
+      "src",
+      "memory://active-image-path",
+    );
+    await waitFor(() => expect(attachmentUrl).toHaveBeenCalledTimes(1));
+    expect(attachmentUrl.mock.calls[0][0].path).toBe("active-image-path");
+    expect(listVisibleAttachments).toHaveBeenCalledWith("product", ["p1"]);
   });
 });

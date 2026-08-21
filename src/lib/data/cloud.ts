@@ -194,6 +194,17 @@ export function createSupabaseAdapter(): DbAdapter {
         query as PromiseLike<QueryResponse<Attachment[]>>,
       );
     },
+    listAttachmentsByOwnerIds: (ownerType, ownerIds) => {
+      if (!ownerIds.length) return Promise.resolve([]);
+      return request<Attachment[]>(
+        client
+          .from("attachments")
+          .select("*")
+          .eq("owner_type", ownerType)
+          .in("owner_id", ownerIds)
+          .order("created_at") as PromiseLike<QueryResponse<Attachment[]>>,
+      );
+    },
     async attachmentUrl(attachment) {
       const response = await withDataTimeout(
         client.storage.from(BUCKET).createSignedUrl(attachment.path, 900),

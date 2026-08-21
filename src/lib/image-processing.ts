@@ -25,6 +25,9 @@ const DARK_PIXEL_LUMA = 58;
 const DARK_ROW_PIXEL_RATIO = 0.78;
 const DARK_ROW_MEAN_LUMA = 68;
 
+export const PRODUCT_IMAGE_MAX_SIDE = 720;
+export const PRODUCT_IMAGE_QUALITY = 0.78;
+
 /**
  * Detects the large dark top/bottom panels around a product image screenshot.
  * Both edge panels must be present, so a dark product on a normal background is
@@ -112,8 +115,8 @@ export async function compressImage(
 /** Product-image path: detect screenshot bars, then crop and compress once. */
 export function prepareProductImage(
   file: Blob,
-  maxSide = 1200,
-  quality = 0.82,
+  maxSide = PRODUCT_IMAGE_MAX_SIDE,
+  quality = PRODUCT_IMAGE_QUALITY,
 ): Promise<ProductImageResult> {
   return renderImage(file, maxSide, quality, true);
 }

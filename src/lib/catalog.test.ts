@@ -66,6 +66,7 @@ describe("catalog", () => {
   });
 
   it("isolates one signed URL failure from other products", async () => {
+    const onResolved = vi.fn();
     const db = {
       listAttachments: vi.fn().mockResolvedValue([
         attachment({ owner_id: "p1", path: "ok" }),
@@ -85,10 +86,33 @@ describe("catalog", () => {
     await expect(loadProductImageUrls(db, [
       product({ id: "p1" }),
       product({ id: "p2" }),
-    ])).resolves.toEqual(
+    ], onResolved)).resolves.toEqual(
       new Map([["p1", "https://signed.example/ok"]]),
     );
     expect(db.listAttachments).toHaveBeenCalledWith("product");
+    expect(onResolved).toHaveBeenCalledWith(
+      "p1",
+      "https://signed.example/ok",
+    );
+  });
+
+  it("starts attachment and catalog metadata requests together", async () => {
+    let resolveAttachments!: (value: Attachment[]) => void;
+    const attachments = new Promise<Attachment[]>((resolve) => {
+      resolveAttachments = resolve;
+    });
+    const db = {
+      listAttachments: vi.fn(() => attachments),
+      listCatalogProducts: vi.fn().mockResolvedValue([]),
+      attachmentUrl: vi.fn(),
+      catalogImageUrl: vi.fn(),
+    };
+
+    const loading = loadProductImageUrls(db, [product()]);
+    expect(db.listAttachments).toHaveBeenCalledTimes(1);
+    expect(db.listCatalogProducts).toHaveBeenCalledTimes(1);
+    resolveAttachments([]);
+    await expect(loading).resolves.toEqual(new Map());
   });
 
   it("lists every attachment for an owner type when owner id is omitted", async () => {

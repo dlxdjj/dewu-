@@ -4,6 +4,7 @@ import Link from "next/link";
 import { PLATFORM_LABELS } from "@/lib/constants/platform";
 import { STATUS_META, UNIT_STATUSES } from "@/lib/constants/status";
 import { formatCents } from "@/lib/utils/money";
+import { rememberDisplayedProductImage } from "@/lib/product-image-cache";
 import {
   groupQuery,
   type PlatformFilter,
@@ -16,6 +17,7 @@ import { workflowActionLabel } from "./UnitWorkflowSheet";
 export default function GroupCard({
   group,
   imageUrl,
+  imagePriority = false,
   platformFilter,
   selectable,
   selected,
@@ -26,6 +28,7 @@ export default function GroupCard({
 }: {
   group: UnitGroup;
   imageUrl: string | null;
+  imagePriority?: boolean;
   platformFilter: PlatformFilter;
   selectable: boolean;
   selected: boolean;
@@ -56,6 +59,14 @@ export default function GroupCard({
           <img
             src={imageUrl}
             alt={group.product.name}
+            width={72}
+            height={72}
+            loading={imagePriority ? "eager" : "lazy"}
+            fetchPriority={imagePriority ? "high" : "auto"}
+            decoding="async"
+            onLoad={(event) => {
+              void rememberDisplayedProductImage(event.currentTarget.currentSrc);
+            }}
             className="h-full w-full object-cover"
           />
         ) : (

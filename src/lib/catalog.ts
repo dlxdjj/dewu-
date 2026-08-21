@@ -1,5 +1,6 @@
 import type { DbAdapter } from "@/lib/data/types";
 import type { Attachment, Product } from "@/lib/types/database";
+import { cachedProductImageUrl } from "@/lib/product-image-cache";
 
 const signedUrlCache = new Map<string, { url: string; expiresAt: number }>();
 
@@ -48,14 +49,25 @@ export function latestProductImageByOwner(
 export async function loadProductImageUrls(
   db: Pick<
     DbAdapter,
-    "listAttachments" | "attachmentUrl" | "listCatalogProducts" | "catalogImageUrl"
+    | "listAttachments"
+    | "listAttachmentsByOwnerIds"
+    | "attachmentUrl"
+    | "listCatalogProducts"
+    | "catalogImageUrl"
   >,
   products: Iterable<Product>,
+  onResolved?: (productId: string, url: string) => void,
 ): Promise<Map<string, string>> {
   const wanted = [...products];
   if (!wanted.length) return new Map();
-  const latest = latestProductImageByOwner(await db.listAttachments("product"));
-  const catalogs = await db.listCatalogProducts().catch(() => []);
+  const productIds = wanted.map((product) => product.id);
+  const [attachments, catalogs] = await Promise.all([
+    db.listAttachmentsByOwnerIds
+      ? db.listAttachmentsByOwnerIds("product", productIds)
+      : db.listAttachments("product"),
+    db.listCatalogProducts().catch(() => []),
+  ]);
+  const latest = latestProductImageByOwner(attachments);
   const catalogMap = new Map(catalogs.map((catalog) => [catalog.id, catalog]));
   const pairs = await Promise.all(
     wanted.map(async (product) => {
@@ -66,8 +78,14 @@ export async function loadProductImageUrls(
           : undefined;
         const path = attachment?.path ?? catalog?.image_path;
         if (!path) return null;
+        const localUrl = await cachedProductImageUrl(path);
+        if (localUrl) {
+          onResolved?.(product.id, localUrl);
+          return [product.id, localUrl] as const;
+        }
         const cached = signedUrlCache.get(path);
         if (cached && cached.expiresAt > Date.now()) {
+          onResolved?.(product.id, cached.url);
           return [product.id, cached.url] as const;
         }
         const url = attachment
@@ -77,6 +95,7 @@ export async function loadProductImageUrls(
           url,
           expiresAt: Date.now() + 12 * 60_000,
         });
+        onResolved?.(product.id, url);
         return [product.id, url] as const;
       } catch {
         return null;

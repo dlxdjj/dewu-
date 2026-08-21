@@ -4,12 +4,16 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   compressImage,
   prepareProductImage,
+  PRODUCT_IMAGE_MAX_SIDE,
+  PRODUCT_IMAGE_QUALITY,
 } from "@/lib/image-processing";
 import ImagePicker from "./ImagePicker";
 
 vi.mock("@/lib/image-processing", () => ({
   compressImage: vi.fn(),
   prepareProductImage: vi.fn(),
+  PRODUCT_IMAGE_MAX_SIDE: 720,
+  PRODUCT_IMAGE_QUALITY: 0.78,
 }));
 
 const mockedPrepare = vi.mocked(prepareProductImage);
@@ -49,6 +53,11 @@ describe("ImagePicker", () => {
     await userEvent.click(screen.getByRole("button", { name: "使用原图" }));
     expect(await screen.findByText("当前使用原图")).toBeInTheDocument();
     expect(onChange).toHaveBeenLastCalledWith(original);
+    expect(mockedCompress).toHaveBeenCalledWith(
+      expect.any(File),
+      PRODUCT_IMAGE_MAX_SIDE,
+      PRODUCT_IMAGE_QUALITY,
+    );
     await userEvent.click(
       screen.getByRole("button", { name: "恢复自动裁剪" }),
     );

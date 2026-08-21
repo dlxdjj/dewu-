@@ -53,6 +53,37 @@ describe("GroupCard", () => {
       "src",
       "https://signed.example/image",
     );
+    expect(screen.getByRole("img", { name: "测试鞋" })).toHaveAttribute(
+      "loading",
+      "lazy",
+    );
+    expect(screen.getByRole("img", { name: "测试鞋" })).toHaveAttribute(
+      "decoding",
+      "async",
+    );
+  });
+
+  it("prioritizes an above-the-fold product image", () => {
+    render(
+      <GroupCard
+        group={group}
+        imageUrl="https://signed.example/priority"
+        imagePriority
+        platformFilter="all"
+        selectable={false}
+        selected={false}
+        onToggle={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByRole("img", { name: "测试鞋" })).toHaveAttribute(
+      "loading",
+      "eager",
+    );
+    expect(screen.getByRole("img", { name: "测试鞋" })).toHaveAttribute(
+      "fetchpriority",
+      "high",
+    );
   });
 
   it("selects the whole group instead of navigating in batch mode", async () => {

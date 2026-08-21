@@ -4,10 +4,12 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import {
   compressImage,
   prepareProductImage,
+  PRODUCT_IMAGE_MAX_SIDE,
+  PRODUCT_IMAGE_QUALITY,
 } from "@/lib/image-processing";
 import { CameraIcon } from "./icons";
 
-/** 商品图片选择：自动裁截图黑边，再压缩到最长边 1200px 的 JPEG。 */
+/** 商品图片选择：自动裁截图黑边，再压缩为适合手机展示的 JPEG。 */
 export default function ImagePicker({
   label,
   value,
@@ -57,7 +59,13 @@ export default function ImagePicker({
     setProcessing(true);
     setError("");
     try {
-      onChange(await compressImage(source, 1200, 0.82));
+      onChange(
+        await compressImage(
+          source,
+          PRODUCT_IMAGE_MAX_SIDE,
+          PRODUCT_IMAGE_QUALITY,
+        ),
+      );
       setUsingOriginal(true);
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "图片处理失败");
