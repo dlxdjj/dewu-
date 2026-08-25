@@ -10,6 +10,7 @@ describe("InventoryGroupPage", () => {
     render(
       <InventoryGroupPage
         dataSource={new MemoryDbAdapter(makeInventorySeed())}
+        returnHref="/inventory?view=sales&sort=profit_desc"
         initialQuery={{
           styleCode: "AB-1",
           productId: null,
@@ -20,6 +21,10 @@ describe("InventoryGroupPage", () => {
     );
 
     expect(await screen.findByText("数量 3 件")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "‹ 销售记录" })).toHaveAttribute(
+      "href",
+      "/inventory?view=sales&sort=profit_desc",
+    );
     expect(screen.getByText("采购成本合计 ¥330.00")).toBeInTheDocument();
     expect(
       screen.getByText("第 1 件 · 淘宝 · 进价 ¥100.00"),
@@ -32,6 +37,12 @@ describe("InventoryGroupPage", () => {
     ).toBeInTheDocument();
     expect(screen.getByText("发往得物途中 · 寄出运费 ¥0.00")).toBeInTheDocument();
     expect(screen.getAllByRole("link", { name: "详情与更多" })).toHaveLength(3);
+    expect(
+      decodeURIComponent(
+        screen.getAllByRole("link", { name: "详情与更多" })[0]
+          .getAttribute("href") ?? "",
+      ),
+    ).toContain("returnTo=/inventory/group?");
     expect(screen.getByRole("button", { name: "寄往得物" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "确认入仓" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "确认到货" })).toBeInTheDocument();

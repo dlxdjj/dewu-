@@ -27,6 +27,8 @@ export default function GroupCard({
   selected,
   onToggle,
   onProcess,
+  onNavigate,
+  returnHref = "/inventory?view=active",
   statusScope,
   showPlatform = true,
 }: {
@@ -39,6 +41,8 @@ export default function GroupCard({
   selected: boolean;
   onToggle: () => void;
   onProcess?: (units: UnitGroup["units"]) => void;
+  onNavigate?: () => void;
+  returnHref?: string;
   statusScope?: GroupSelection["scope"];
   showPlatform?: boolean;
 }) {
@@ -136,7 +140,8 @@ export default function GroupCard({
   return (
     <article className="min-w-0 overflow-hidden rounded-[28px] border border-separator bg-card shadow-[var(--cirrus-shadow-1)]">
       <Link
-        href={`/inventory/group?${groupQuery(group, platformFilter, statusScope)}`}
+        href={`/inventory/group?${groupQuery(group, platformFilter, statusScope)}&returnTo=${encodeURIComponent(returnHref)}`}
+        onClick={onNavigate}
         className="flex min-w-0 w-full max-w-full gap-3 overflow-hidden p-4 text-left active:bg-background"
       >
         {content}

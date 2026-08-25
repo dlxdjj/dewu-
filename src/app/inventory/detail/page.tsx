@@ -20,6 +20,10 @@ import {
   STATUS_META,
   type UnitStatus,
 } from "@/lib/constants/status";
+import {
+  inventoryReturnLabel,
+  safeInventoryDetailReturn,
+} from "@/lib/inventory-navigation";
 
 export default function DetailPage() {
   return (
@@ -40,6 +44,10 @@ function LoadingCard() {
 function Detail() {
   const params = useSearchParams();
   const id = params.get("id") ?? "";
+  const returnHref = safeInventoryDetailReturn(params.get("returnTo"));
+  const returnLabel = returnHref.startsWith("/inventory/group")
+    ? "同款明细"
+    : inventoryReturnLabel(returnHref);
   const router = useRouter();
   const shared = useAppData();
   const [unit, setUnit] = useState<UnitJoined | null>(null);
@@ -85,8 +93,8 @@ function Detail() {
   if (!unit) {
     return (
       <>
-        <Link href="/inventory" className="text-tint">
-          ‹ 库存
+        <Link href={returnHref} className="inline-flex min-h-11 items-center text-tint">
+          ‹ {returnLabel}
         </Link>
         <Card className="mt-4">
           <p className="text-sm text-muted">{error || "加载中…"}</p>
@@ -99,8 +107,8 @@ function Detail() {
 
   return (
     <>
-      <Link href="/inventory" className="text-tint">
-        ‹ 库存
+      <Link href={returnHref} className="inline-flex min-h-11 items-center text-tint">
+        ‹ {returnLabel}
       </Link>
       <h1 className="mt-2 text-xl font-bold">{unit.product.name}</h1>
       <p className="text-sm text-muted">

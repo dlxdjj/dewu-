@@ -19,17 +19,28 @@ import type { UnitJoined } from "@/lib/types/database";
 import { type GroupSelection, matchesGroup } from "@/lib/utils/group";
 import { formatCents, formatSignedCents } from "@/lib/utils/money";
 import { profitColor, unitProfit } from "@/lib/utils/profit";
+import {
+  inventoryReturnLabel,
+  safeInventoryHref,
+} from "@/lib/inventory-navigation";
 
 interface InventoryGroupPageProps {
   dataSource?: DbAdapter;
   initialQuery?: GroupSelection;
+  returnHref?: string;
 }
 
 export default function InventoryGroupPage(
   props: InventoryGroupPageProps = {},
 ) {
   if (props.initialQuery) {
-    return <GroupContent dataSource={props.dataSource} selection={props.initialQuery} />;
+    return (
+      <GroupContent
+        dataSource={props.dataSource}
+        selection={props.initialQuery}
+        returnHref={safeInventoryHref(props.returnHref)}
+      />
+    );
   }
   return (
     <Suspense fallback={<p>加载中…</p>}>
@@ -51,6 +62,7 @@ function SearchParamGroup({ dataSource }: { dataSource?: DbAdapter }) {
   return (
     <GroupContent
       dataSource={dataSource}
+      returnHref={safeInventoryHref(params.get("returnTo"))}
       selection={{
         styleCode: params.get("style"),
         productId: params.get("product"),
@@ -65,9 +77,11 @@ function SearchParamGroup({ dataSource }: { dataSource?: DbAdapter }) {
 function GroupContent({
   dataSource,
   selection,
+  returnHref,
 }: {
   dataSource?: DbAdapter;
   selection: GroupSelection;
+  returnHref: string;
 }) {
   const [units, setUnits] = useState<UnitJoined[]>([]);
   const [loading, setLoading] = useState(true);
@@ -83,6 +97,7 @@ function GroupContent({
     [dataSource],
   );
   const { platform, productId, scope, size, styleCode } = selection;
+  const groupHref = groupPageHref(selection, returnHref);
 
   useEffect(() => {
     let active = true;
@@ -158,8 +173,8 @@ function GroupContent({
 
   return (
     <>
-      <Link href="/inventory" className="text-tint">
-        ‹ 库存
+      <Link href={returnHref} className="inline-flex min-h-11 items-center text-tint">
+        ‹ {inventoryReturnLabel(returnHref)}
       </Link>
       <h1 className="mt-3 text-xl font-bold">
         {units[0]?.product.name ?? "合并库存"}
@@ -241,7 +256,7 @@ function GroupContent({
                 </button>
               )}
               <Link
-                href={`/inventory/detail?id=${unit.id}`}
+                href={`/inventory/detail?id=${unit.id}&returnTo=${encodeURIComponent(groupHref)}`}
                 className="inline-flex min-h-11 items-center text-[15px] text-tint"
               >
                 详情与更多
@@ -281,4 +296,18 @@ function GroupContent({
       )}
     </>
   );
+}
+
+function groupPageHref(
+  selection: GroupSelection,
+  returnHref: string,
+): string {
+  const params = new URLSearchParams();
+  if (selection.styleCode) params.set("style", selection.styleCode);
+  else if (selection.productId) params.set("product", selection.productId);
+  params.set("size", selection.size);
+  if (selection.platform) params.set("platform", selection.platform);
+  if (selection.scope) params.set("scope", selection.scope);
+  params.set("returnTo", returnHref);
+  return `/inventory/group?${params.toString()}`;
 }

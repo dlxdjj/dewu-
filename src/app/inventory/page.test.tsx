@@ -182,6 +182,9 @@ describe("InventoryPage", () => {
 
     expect(await screen.findByText("利润合计")).toBeInTheDocument();
     expect(screen.getByText("+¥100.00")).toHaveStyle({ color: "#1B7F37" });
+    const groupLink = screen.getByRole("link", { name: /利润鞋/ });
+    expect(decodeURIComponent(groupLink.getAttribute("href") ?? ""))
+      .toContain("returnTo=/inventory?view=sales");
   });
 
   it("keeps refunded goods out of current inventory and in refund history", async () => {

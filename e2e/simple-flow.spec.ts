@@ -573,6 +573,13 @@ test("390px inventory supports quick batch settlement and shipping with freight"
     page.getByRole("button", { name: "录入到手价 · 2 件" }),
   ).not.toBeVisible();
 
+  await page.getByRole("button", { name: "销售记录 2" }).click();
+  await page.getByRole("link", { name: /真实流程测试鞋/ }).click();
+  await expect(page.getByRole("link", { name: "‹ 销售记录" })).toBeVisible();
+  await page.getByRole("link", { name: "‹ 销售记录" }).click();
+  await expect(page.getByRole("button", { name: "销售记录 2" }))
+    .toHaveAttribute("aria-pressed", "true");
+
   await page.getByRole("button", { name: "当前库存 1" }).click();
   await page.getByRole("button", { name: "筛选" }).click();
   await page.getByRole("button", { name: "已到货" }).click();

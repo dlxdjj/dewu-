@@ -33,6 +33,10 @@ import type {
   InventoryView,
 } from "@/lib/data/types";
 import type { UnitJoined } from "@/lib/types/database";
+import {
+  inventoryReturnHref,
+  inventoryScrollKey,
+} from "@/lib/inventory-navigation";
 import type { PlatformFilter, StatusFilter } from "@/lib/utils/group";
 
 const PAGE_SIZE = 20;
@@ -77,6 +81,7 @@ export default function InventoryPage({
   const [missingSizeOnly, setMissingSizeOnly] = useState(false);
   const [filterOpen, setFilterOpen] = useState(false);
   const [initialized, setInitialized] = useState(false);
+  const [initialLimit, setInitialLimit] = useState(PAGE_SIZE);
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [loadError, setLoadError] = useState("");
@@ -88,6 +93,7 @@ export default function InventoryPage({
   const pendingImageIdsRef = useRef(new Set<string>());
   const mountedRef = useRef(true);
   const requestVersionRef = useRef(0);
+  const scrollRestoredRef = useRef(false);
   const shared = useAppData();
   const bulk = !dataSource && shared?.data?.preferences.workflow === "bulk";
   const resolveDb = useCallback(
@@ -99,12 +105,26 @@ export default function InventoryPage({
     const params = new URLSearchParams(window.location.search);
     const requestedView = params.get("view");
     const requestedStatus = params.get("status") as UnitStatus | null;
+    const requestedPlatform = params.get("platform");
+    const requestedSort = params.get("sort");
+    const requestedLoaded = Number(params.get("loaded"));
     queueMicrotask(() => {
       if (VIEWS.some((item) => item.value === requestedView)) {
         setView(requestedView as InventoryView);
       }
       if (requestedStatus && ACTIVE_STATUSES.includes(requestedStatus)) {
         setStatusFilter(requestedStatus);
+      }
+      if (PLATFORMS.some((item) => item.value === requestedPlatform)) {
+        setPlatformFilter(requestedPlatform as PlatformFilter);
+      }
+      if (SORTS.some((item) => item.value === requestedSort)) {
+        setSort(requestedSort as InventorySort);
+      }
+      setQuery(params.get("q") ?? "");
+      setMissingSizeOnly(params.get("missingSize") === "1");
+      if (Number.isInteger(requestedLoaded) && requestedLoaded > PAGE_SIZE) {
+        setInitialLimit(Math.min(requestedLoaded, 100));
       }
       setInitialized(true);
     });
@@ -120,6 +140,7 @@ export default function InventoryPage({
   const loadPage = useCallback(async (
     offset: number,
     replace: boolean,
+    limit = PAGE_SIZE,
   ): Promise<void> => {
     if (!dataSource && shared && !shared.data) {
       setLoading(shared.loading);
@@ -138,7 +159,7 @@ export default function InventoryPage({
         query: deferredQuery,
         missingSizeOnly,
         sort,
-        limit: PAGE_SIZE,
+        limit,
         offset,
       });
       if (!mountedRef.current || version !== requestVersionRef.current) return;
@@ -172,8 +193,8 @@ export default function InventoryPage({
 
   useEffect(() => {
     if (!initialized) return;
-    void Promise.resolve().then(() => loadPage(0, true));
-  }, [initialized, loadPage]);
+    void Promise.resolve().then(() => loadPage(0, true, initialLimit));
+  }, [initialLimit, initialized, loadPage]);
 
   const visibleProducts = useMemo(
     () => [...new Map(groups.map((group) => [group.product.id, group.product])).values()],
@@ -213,6 +234,41 @@ export default function InventoryPage({
   const pageTitle = view === "active"
     ? "库存"
     : VIEWS.find((item) => item.value === view)?.label ?? "库存";
+  const returnHref = useMemo(() => inventoryReturnHref({
+    view,
+    status: statusFilter,
+    platform: bulk ? "all" : platformFilter,
+    query,
+    missingSizeOnly,
+    sort,
+    loaded: Math.max(PAGE_SIZE, groups.length),
+  }), [
+    bulk,
+    groups.length,
+    missingSizeOnly,
+    platformFilter,
+    query,
+    sort,
+    statusFilter,
+    view,
+  ]);
+
+  useEffect(() => {
+    if (!initialized || loading || scrollRestoredRef.current) return;
+    scrollRestoredRef.current = true;
+    try {
+      const key = inventoryScrollKey(returnHref);
+      const saved = Number(sessionStorage.getItem(key));
+      sessionStorage.removeItem(key);
+      if (!Number.isFinite(saved) || saved <= 0) return;
+      requestAnimationFrame(() => requestAnimationFrame(() => window.scrollTo({
+        top: saved,
+        behavior: "auto",
+      })));
+    } catch {
+      // Scroll restoration is a convenience and must not block inventory.
+    }
+  }, [initialized, loading, returnHref]);
 
   function resetSelection(): void {
     setSelecting(false);
@@ -243,7 +299,7 @@ export default function InventoryPage({
     setNotice(message);
     resetSelection();
     await shared?.refresh();
-    await loadPage(0, true);
+    await loadPage(0, true, Math.max(PAGE_SIZE, groups.length));
   }
 
   return (
@@ -368,6 +424,17 @@ export default function InventoryPage({
                 selectable={selecting}
                 selected={group.units.every((unit) => selected.has(unit.id))}
                 onToggle={() => toggleGroup(group)}
+                returnHref={returnHref}
+                onNavigate={() => {
+                  try {
+                    sessionStorage.setItem(
+                      inventoryScrollKey(returnHref),
+                      String(window.scrollY),
+                    );
+                  } catch {
+                    // Navigation remains valid when session storage is unavailable.
+                  }
+                }}
                 onProcess={view === "refunds" ? undefined : setWorkflowUnits}
                 statusScope={
                   view === "active"
