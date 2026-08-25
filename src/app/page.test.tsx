@@ -3,50 +3,44 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import HomePage from "./page";
 
 const dataMocks = vi.hoisted(() => ({
-  getAccountPreferences: vi.fn(),
-  listUnits: vi.fn(),
-  listSales: vi.fn(),
-  listRebates: vi.fn(),
-  listShippingEvents: vi.fn(),
-  listShippingEventItems: vi.fn(),
+  getHomeDashboard: vi.fn(),
 }));
 
 const dataSource = {
-  getAccountPreferences: dataMocks.getAccountPreferences,
-  listUnits: dataMocks.listUnits,
-  listSales: dataMocks.listSales,
-  listRebates: dataMocks.listRebates,
-  listShippingEvents: dataMocks.listShippingEvents,
-  listShippingEventItems: dataMocks.listShippingEventItems,
+  getHomeDashboard: dataMocks.getHomeDashboard,
 };
 
 describe("HomePage", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    dataMocks.getAccountPreferences.mockResolvedValue({
-      user_id: "owner",
-      workflow: "standard",
-      updated_at: "2026-08-01T00:00:00Z",
+    dataMocks.getHomeDashboard.mockResolvedValue({
+      inventoryCount: 0,
+      inventoryCostCents: 0,
+      month: "2026-08",
+      monthLabel: "8月",
+      monthlySalesCount: 0,
+      monthlySalesCents: 0,
+      monthlyShippingCents: 0,
+      monthlyRebateCents: 0,
+      monthlyProfitCents: 0,
+      rebatesEnabled: true,
+      todoCounts: {
+        pending: 0,
+        arrived: 0,
+        shipping: 0,
+        in_stock_dewu: 0,
+        sold: 0,
+        returned: 0,
+      },
     });
-    dataMocks.listUnits.mockResolvedValue([]);
-    dataMocks.listSales.mockResolvedValue([]);
-    dataMocks.listRebates.mockResolvedValue([]);
-    dataMocks.listShippingEvents.mockResolvedValue([]);
-    dataMocks.listShippingEventItems.mockResolvedValue([]);
   });
 
   it("renders exactly the four agreed metrics for the current month", async () => {
-    dataMocks.listRebates.mockResolvedValue([
-      {
-        id: "r1",
-        user_id: "u1",
-        month: "2026-08-01",
-        source: "taobao_alliance",
-        amount_cents: 3000,
-        created_at: "2026-08-01T00:00:00Z",
-        updated_at: "2026-08-01T00:00:00Z",
-      },
-    ]);
+    dataMocks.getHomeDashboard.mockResolvedValue({
+      ...(await dataMocks.getHomeDashboard()),
+      monthlyRebateCents: 3000,
+      monthlyProfitCents: 3000,
+    });
     render(
       <HomePage
         dataSource={dataSource}
@@ -75,7 +69,7 @@ describe("HomePage", () => {
   });
 
   it("exits placeholder state and provides retry after a data error", async () => {
-    dataMocks.listUnits.mockRejectedValue(new Error("读取数据库超时"));
+    dataMocks.getHomeDashboard.mockRejectedValue(new Error("读取数据库超时"));
 
     render(
       <HomePage
@@ -92,10 +86,9 @@ describe("HomePage", () => {
   });
 
   it("does not load, display or count rebates for a bulk account", async () => {
-    dataMocks.getAccountPreferences.mockResolvedValue({
-      user_id: "friend",
-      workflow: "bulk",
-      updated_at: "2026-08-01T00:00:00Z",
+    dataMocks.getHomeDashboard.mockResolvedValue({
+      ...(await dataMocks.getHomeDashboard()),
+      rebatesEnabled: false,
     });
 
     render(
@@ -109,6 +102,5 @@ describe("HomePage", () => {
     expect(screen.queryByText(/返利/)).not.toBeInTheDocument();
     expect(screen.getByText("本月暂无已结算销售；完成结算后将显示利润。"))
       .toBeInTheDocument();
-    expect(dataMocks.listRebates).not.toHaveBeenCalled();
   });
 });

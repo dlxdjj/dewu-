@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import { makeJoinedUnit } from "@/test/inventory-fixtures";
@@ -113,6 +113,28 @@ describe("GroupCard", () => {
       />,
     );
     expect(screen.queryByText("利润合计")).not.toBeInTheDocument();
+  });
+
+  it("retries a failed remote image before falling back to the box icon", () => {
+    render(
+      <GroupCard
+        group={group}
+        imageUrl="https://signed.example/image?token=test"
+        platformFilter="all"
+        selectable={false}
+        selected={false}
+        onToggle={vi.fn()}
+      />,
+    );
+
+    fireEvent.error(screen.getByRole("img", { name: "测试鞋" }));
+    expect(screen.getByRole("img", { name: "测试鞋" })).toHaveAttribute(
+      "src",
+      expect.stringContaining("retry=1"),
+    );
+    fireEvent.error(screen.getByRole("img", { name: "测试鞋" }));
+    fireEvent.error(screen.getByRole("img", { name: "测试鞋" }));
+    expect(screen.queryByRole("img", { name: "测试鞋" })).not.toBeInTheDocument();
   });
 
   it("selects the whole group instead of navigating in batch mode", async () => {

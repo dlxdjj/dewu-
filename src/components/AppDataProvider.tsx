@@ -3,7 +3,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
 import { getDb } from "@/lib/data";
-import { supportsRebateIncome } from "@/lib/account-features";
 import { toAppPathname } from "@/lib/base-path";
 import { onAuthSessionChange } from "@/lib/supabase/auth";
 import type {
@@ -47,6 +46,7 @@ export default function AppDataProvider({ children }: { children: React.ReactNod
   const [loadingWorkflow, setLoadingWorkflow] = useState<AccountWorkflow | null>(null);
   const activeUserId = useRef<string | null>(null);
   const loadVersion = useRef(0);
+  const welcomedUsers = useRef(new Set<string>());
 
   const refresh = useCallback(async () => {
     const version = ++loadVersion.current;
@@ -54,28 +54,31 @@ export default function AppDataProvider({ children }: { children: React.ReactNod
     setLoading(true);
     try {
       const db = getDb();
-      const preferencesPromise = db.getAccountPreferences();
-      const unitsPromise = db.listUnits();
-      const productsPromise = db.listProducts();
-      const batchesPromise = db.listBatches();
-      const salesPromise = db.listSales();
-      const shippingEventsPromise = db.listShippingEvents();
-      const shippingEventItemsPromise = db.listShippingEventItems();
-      const preferences = await preferencesPromise;
+      const preferences = await db.getAccountPreferences();
       if (version !== loadVersion.current) return;
       setLoadingWorkflow(preferences.workflow);
-      const [units, products, batches, sales, rebates, shippingEvents, shippingEventItems] = await Promise.all([
-        unitsPromise,
-        productsPromise,
-        batchesPromise,
-        salesPromise,
-        supportsRebateIncome(preferences.workflow) ? db.listRebates() : Promise.resolve([]),
-        shippingEventsPromise,
-        shippingEventItemsPromise,
-      ]);
-      if (version !== loadVersion.current) return;
+      if (
+        preferences.workflow === "bulk" &&
+        preferences.user_id &&
+        !welcomedUsers.current.has(preferences.user_id)
+      ) {
+        welcomedUsers.current.add(preferences.user_id);
+        await new Promise((resolve) => window.setTimeout(resolve, 450));
+        if (version !== loadVersion.current) return;
+      }
       activeUserId.current = preferences.user_id || null;
-      setData({ preferences, units, products, batches, sales, rebates, shippingEvents, shippingEventItems });
+      // Route-level server queries own the large datasets. Keeping only account
+      // preferences here prevents every page from downloading the full ledger.
+      setData({
+        preferences,
+        units: [],
+        products: [],
+        batches: [],
+        sales: [],
+        rebates: [],
+        shippingEvents: [],
+        shippingEventItems: [],
+      });
     } catch (reason) {
       if (version !== loadVersion.current) return;
       setError(reason instanceof Error ? reason.message : "加载失败");

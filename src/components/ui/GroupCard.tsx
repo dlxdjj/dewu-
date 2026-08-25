@@ -1,11 +1,13 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
 import { PLATFORM_LABELS } from "@/lib/constants/platform";
 import { STATUS_META, UNIT_STATUSES } from "@/lib/constants/status";
 import { formatCents, formatSignedCents } from "@/lib/utils/money";
 import { profitColor } from "@/lib/utils/profit";
 import { rememberDisplayedProductImage } from "@/lib/product-image-cache";
+import { recordClientEvent } from "@/lib/monitoring";
 import {
   groupQuery,
   type PlatformFilter,
@@ -57,24 +59,12 @@ export default function GroupCard({
   const content = (
     <>
       <div className="flex h-[72px] w-[72px] shrink-0 items-center justify-center overflow-hidden rounded-[20px] bg-background text-muted">
-        {imageUrl ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
-            src={imageUrl}
-            alt={group.product.name}
-            width={72}
-            height={72}
-            loading={imagePriority ? "eager" : "lazy"}
-            fetchPriority={imagePriority ? "high" : "auto"}
-            decoding="async"
-            onLoad={(event) => {
-              void rememberDisplayedProductImage(event.currentTarget.currentSrc);
-            }}
-            className="h-full w-full object-cover"
-          />
-        ) : (
-          <BoxIcon size={24} strokeWidth={1.4} />
-        )}
+        <ProductThumbnail
+          key={imageUrl ?? "empty"}
+          imageUrl={imageUrl}
+          name={group.product.name}
+          priority={imagePriority}
+        />
       </div>
       <div className="min-w-0 flex-1">
         <div className="flex items-start justify-between gap-2">
@@ -164,4 +154,56 @@ export default function GroupCard({
       )}
     </article>
   );
+}
+
+function ProductThumbnail({
+  imageUrl,
+  name,
+  priority,
+}: {
+  imageUrl: string | null;
+  name: string;
+  priority: boolean;
+}) {
+  const [attempt, setAttempt] = useState(0);
+  const [failed, setFailed] = useState(false);
+  if (!imageUrl || failed) return <BoxIcon size={24} strokeWidth={1.4} />;
+  const src = retryImageUrl(imageUrl, attempt);
+  return (
+    // eslint-disable-next-line @next/next/no-img-element
+    <img
+      src={src}
+      alt={name}
+      width={72}
+      height={72}
+      loading={priority ? "eager" : "lazy"}
+      fetchPriority={priority ? "high" : "auto"}
+      decoding="async"
+      onLoad={(event) => {
+        void rememberDisplayedProductImage(event.currentTarget.currentSrc);
+      }}
+      onError={() => {
+        if (attempt < 2) {
+          setAttempt((value) => value + 1);
+          return;
+        }
+        recordClientEvent("image_error", `商品图片加载失败：${name}`);
+        setFailed(true);
+      }}
+      className="h-full w-full object-cover"
+    />
+  );
+}
+
+function retryImageUrl(value: string, attempt: number): string {
+  if (!attempt || value.startsWith("blob:") || value.startsWith("memory:")) {
+    return value;
+  }
+  try {
+    const url = new URL(value);
+    url.searchParams.set("retry", String(attempt));
+    return url.toString();
+  } catch {
+    return value;
+  }
 }

@@ -1,6 +1,6 @@
 import type { Platform } from "@/lib/constants/platform";
 import type { UnitStatus } from "@/lib/constants/status";
-import type { AccountPreferences, Attachment, AttachmentKind, AttachmentOwner, CatalogProduct, InventoryUnit, MonthlyRebate, Product, PurchaseBatch, Sale, ShippingEvent, ShippingEventItem, StatusHistory } from "@/lib/types/database";
+import type { AccountPreferences, Attachment, AttachmentKind, AttachmentOwner, CatalogProduct, InventoryUnit, MonthlyRebate, Product, PurchaseBatch, Sale, ShippingEvent, ShippingEventItem, StatusHistory, UnitJoined } from "@/lib/types/database";
 
 export interface ShippingAllocation { unitId: string; shippingCents: number; }
 export interface ShipUnitsInput {
@@ -47,6 +47,91 @@ export interface ImportPurchasesResult {
 }
 export interface UnitSizeAssignment { unitId: string; size: string; }
 
+export type InventoryView = "active" | "settlement" | "sales" | "refunds";
+export type InventorySort =
+  | "purchase_desc"
+  | "purchase_asc"
+  | "cost_desc"
+  | "cost_asc"
+  | "profit_desc"
+  | "profit_asc";
+export interface InventoryPageInput {
+  view: InventoryView;
+  status: UnitStatus | "all";
+  platform: Platform | "all";
+  query: string;
+  missingSizeOnly: boolean;
+  sort: InventorySort;
+  limit: number;
+  offset: number;
+}
+export interface InventoryGroupPageRow {
+  key: string;
+  product: Product;
+  styleCode: string | null;
+  size: string;
+  totalCostCents: number;
+  platforms: Platform[];
+  statusCounts: Partial<Record<UnitStatus, number>>;
+  units: UnitJoined[];
+  purchasedAt: string;
+  profitCents: number;
+}
+export interface InventoryPageResult {
+  groups: InventoryGroupPageRow[];
+  totalGroups: number;
+  totalUnits: number;
+  counts: Record<InventoryView, number>;
+  availablePlatforms: Platform[];
+}
+export interface HomeDashboardResult {
+  inventoryCount: number;
+  inventoryCostCents: number;
+  month: string;
+  monthLabel: string;
+  monthlySalesCount: number;
+  monthlySalesCents: number;
+  monthlyShippingCents: number;
+  monthlyRebateCents: number;
+  monthlyProfitCents: number;
+  rebatesEnabled: boolean;
+  todoCounts: Pick<Record<UnitStatus, number>, "pending" | "arrived" | "shipping" | "in_stock_dewu" | "sold" | "returned">;
+}
+export interface ReportSummaryResult {
+  profitCents: number;
+  rebateCents: number;
+  salesCents: number;
+  salesCount: number;
+  shippingCents: number;
+}
+export interface ReportDashboardRow {
+  unit: InventoryUnit;
+  sale: Sale;
+  product: Product;
+  batch: PurchaseBatch;
+  profit: number;
+}
+export interface ReportDashboardInput {
+  month: string;
+  limit: number;
+  offset: number;
+  lossesOnly: boolean;
+}
+export interface ReportDashboardResult {
+  allTime: ReportSummaryResult;
+  selectedMonth: ReportSummaryResult;
+  rows: ReportDashboardRow[];
+  totalRows: number;
+  rebatesEnabled: boolean;
+  rebates: MonthlyRebate[];
+}
+export interface ClientEventSummary {
+  errors: number;
+  slowRequests: number;
+  imageErrors: number;
+  lastEventAt: string | null;
+}
+
 export interface DbAdapter {
   readonly kind: "supabase" | "memory";
   listProducts(): Promise<Product[]>; listBatches(): Promise<PurchaseBatch[]>; listUnits(): Promise<InventoryUnit[]>;
@@ -58,6 +143,10 @@ export interface DbAdapter {
   listShippingEventItems(): Promise<ShippingEventItem[]>;
   listAttachments(ownerType: AttachmentOwner, ownerId?: string): Promise<Attachment[]>;
   listAttachmentsByOwnerIds?(ownerType: AttachmentOwner, ownerIds: string[]): Promise<Attachment[]>;
+  getHomeDashboard(month: string): Promise<HomeDashboardResult>;
+  listInventoryGroupsPage(input: InventoryPageInput): Promise<InventoryPageResult>;
+  getReportDashboard(input: ReportDashboardInput): Promise<ReportDashboardResult>;
+  getClientEventSummary(): Promise<ClientEventSummary>;
   attachmentUrl(attachment: Attachment): Promise<string>; saveAttachment(input: SaveAttachmentInput): Promise<Attachment>;
   catalogImageUrl(catalogProduct: CatalogProduct): Promise<string>;
   createPurchase(input: PurchaseInput): Promise<PurchaseResult>;

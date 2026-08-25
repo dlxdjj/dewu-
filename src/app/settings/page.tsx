@@ -11,6 +11,7 @@ import {
   retryStorageCleanup,
 } from "@/lib/services/maintenance";
 import { getSession, signOut } from "@/lib/supabase/auth";
+import type { ClientEventSummary } from "@/lib/data/types";
 
 export default function SettingsPage() {
   const router = useRouter();
@@ -20,11 +21,16 @@ export default function SettingsPage() {
   const [confirmation, setConfirmation] = useState("");
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState(false);
+  const [health, setHealth] = useState<ClientEventSummary | null>(null);
 
   useEffect(() => {
     void getSession().then((session) => setEmail(session?.user.email ?? ""));
     const notice = sessionStorage.getItem("pms_cleanup_notice");
     if (notice) queueMicrotask(() => setMessage(notice));
+    void Promise.resolve()
+      .then(() => getDb().getClientEventSummary())
+      .then(setHealth)
+      .catch(() => setHealth(null));
   }, []);
 
   async function handleStorageCleanup(): Promise<void> {
@@ -95,6 +101,27 @@ export default function SettingsPage() {
           >
             {busy ? "处理中…" : "重试附件清理"}
           </button>
+        </Card>
+
+        <Card>
+          <h2 className="font-medium">近7天运行状态</h2>
+          {health ? (
+            <div className="mt-2 grid grid-cols-3 gap-2 text-center text-xs">
+              <div className="rounded-xl bg-background p-2">
+                <b className="block text-lg">{health.errors}</b>页面错误
+              </div>
+              <div className="rounded-xl bg-background p-2">
+                <b className="block text-lg">{health.slowRequests}</b>慢请求
+              </div>
+              <div className="rounded-xl bg-background p-2">
+                <b className="block text-lg">{health.imageErrors}</b>图片失败
+              </div>
+            </div>
+          ) : (
+            <p className="mt-1 text-xs leading-5 text-muted">
+              执行最新数据库迁移后，将在这里显示错误与慢请求统计。
+            </p>
+          )}
         </Card>
 
         <Card className="border border-danger/30 md:col-span-2">

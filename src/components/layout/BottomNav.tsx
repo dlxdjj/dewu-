@@ -21,6 +21,7 @@ const tabs = [
 
 export default function BottomNav() {
   const pathname = toAppPathname(usePathname());
+  if (pathname === "/login") return null;
 
   return (
     <nav

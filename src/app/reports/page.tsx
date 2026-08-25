@@ -1,43 +1,23 @@
 "use client";
 
-import { useEffect, useMemo, useState, type FormEvent } from "react";
+import { useCallback, useEffect, useState, type FormEvent } from "react";
 import Card from "@/components/ui/Card";
 import PageHeader from "@/components/ui/PageHeader";
 import Stat from "@/components/ui/Stat";
 import { useAppData } from "@/components/AppDataProvider";
-import { supportsRebateIncome } from "@/lib/account-features";
 import { REBATE_SOURCE_LABELS, type RebateSource } from "@/lib/constants/rebate";
 import { getDb } from "@/lib/data";
 import type { DbAdapter } from "@/lib/data/types";
+import type { ReportDashboardResult } from "@/lib/data/types";
 import {
   buildCsv,
-  buildSettlementReport,
   type SettlementSummary,
 } from "@/lib/reports";
 import { saveMonthlyRebates } from "@/lib/services/rebate";
-import type {
-  AccountPreferences,
-  InventoryUnit,
-  MonthlyRebate,
-  Product,
-  PurchaseBatch,
-  Sale,
-  ShippingEvent,
-  ShippingEventItem,
-} from "@/lib/types/database";
+import type { MonthlyRebate } from "@/lib/types/database";
 import { monthKey } from "@/lib/utils/format";
-import { formatCents, normalizeMoneyInput } from "@/lib/utils/money";
-
-interface ReportSource {
-  preferences: AccountPreferences;
-  units: InventoryUnit[];
-  products: Product[];
-  batches: PurchaseBatch[];
-  sales: Sale[];
-  rebates: MonthlyRebate[];
-  shippingEvents: ShippingEvent[];
-  shippingEventItems: ShippingEventItem[];
-}
+import { formatCents, formatSignedCents, normalizeMoneyInput } from "@/lib/utils/money";
+import { profitColor } from "@/lib/utils/profit";
 
 export default function ReportsPage({
   dataSource,
@@ -49,53 +29,89 @@ export default function ReportsPage({
   const [month, setMonth] = useState(
     () => initialMonth ?? monthKey(new Date()),
   );
-  const [raw, setRaw] = useState<ReportSource | null>(null);
+  const [report, setReport] = useState<ReportDashboardResult | null>(null);
+  const [lossesOnly, setLossesOnly] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [exporting, setExporting] = useState(false);
   const [error, setError] = useState("");
   const shared = useAppData();
 
+  const loadDashboard = useCallback(async (
+    offset: number,
+    replace: boolean,
+  ): Promise<void> => {
+    if (!dataSource && shared && !shared.data) {
+      setLoading(shared.loading);
+      setError(shared.error);
+      return;
+    }
+    if (replace) setLoading(true);
+    else setLoadingMore(true);
+    setError("");
+    try {
+      const result = await (dataSource ?? getDb()).getReportDashboard({
+        month,
+        limit: 20,
+        offset,
+        lossesOnly,
+      });
+      setReport((current) => replace || !current
+        ? result
+        : { ...result, rows: [...current.rows, ...result.rows] });
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "加载失败");
+    } finally {
+      setLoading(false);
+      setLoadingMore(false);
+    }
+  }, [dataSource, lossesOnly, month, shared]);
+
   useEffect(() => {
-    let active = true;
-    if (!dataSource && shared) {
-      return () => { active = false; };
-    }
-    const db = dataSource ?? getDb();
-    async function load(): Promise<void> {
-      try {
-        const preferences = await db.getAccountPreferences();
-        const rebatesEnabled = supportsRebateIncome(preferences.workflow);
-        const [units, products, batches, sales, rebates, shippingEvents, shippingEventItems] = await Promise.all([
-          db.listUnits(),
-          db.listProducts(),
-          db.listBatches(),
-          db.listSales(),
-          rebatesEnabled ? db.listRebates() : Promise.resolve([]),
-          db.listShippingEvents(),
-          db.listShippingEventItems(),
-        ]);
-        if (active) setRaw({ preferences, units, products, batches, sales, rebates, shippingEvents, shippingEventItems });
-      } catch (reason: unknown) {
-        if (active) {
-          setError(reason instanceof Error ? reason.message : "加载失败");
-        }
-      }
-    }
-    void load();
-    return () => {
-      active = false;
-    };
-  }, [dataSource, shared]);
+    void Promise.resolve().then(() => loadDashboard(0, true));
+  }, [loadDashboard]);
 
-  const source = !dataSource && shared ? shared.data : raw;
-  const displayError = !dataSource && shared ? shared.error : error;
-  const rebatesEnabled = source
-    ? supportsRebateIncome(source.preferences.workflow)
-    : true;
-
-  const report = useMemo(
-    () => (source ? buildSettlementReport({ ...source, month, includeRebates: rebatesEnabled }) : null),
-    [source, month, rebatesEnabled],
-  );
+  const rebatesEnabled = report?.rebatesEnabled ??
+    (shared?.data?.preferences.workflow !== "bulk");
   const monthText = `${Number(month.slice(5))}月`;
+
+  async function exportCsv(): Promise<void> {
+    if (!report) return;
+    setExporting(true);
+    try {
+      const db = dataSource ?? getDb();
+      const rows = [];
+      let offset = 0;
+      let total = 1;
+      while (offset < total) {
+        const page = await db.getReportDashboard({
+          month,
+          limit: 100,
+          offset,
+          lossesOnly: false,
+        });
+        rows.push(...page.rows);
+        total = page.totalRows;
+        offset += page.rows.length;
+        if (!page.rows.length) break;
+      }
+      const url = URL.createObjectURL(new Blob([
+        buildCsv({
+          allTime: report.allTime,
+          selectedMonth: report.selectedMonth,
+          rows,
+          rebates: report.rebates,
+        }, month, { includeRebates: rebatesEnabled }),
+      ], { type: "text/csv;charset=utf-8" }));
+      const anchor = document.createElement("a");
+      anchor.href = url;
+      anchor.download = `报表-${month}.csv`;
+      anchor.click();
+      URL.revokeObjectURL(url);
+    } finally {
+      setExporting(false);
+    }
+  }
 
   return (
     <>
@@ -103,10 +119,10 @@ export default function ReportsPage({
         title="报表"
         subtitle={rebatesEnabled ? "已结算实际到账 + 返利收入" : "已结算实际到账"}
       />
-      {displayError ? (
+      {error ? (
         <Card>
           <p role="alert" className="text-sm text-danger">
-            {displayError}
+            {error}
           </p>
         </Card>
       ) : (
@@ -130,28 +146,21 @@ export default function ReportsPage({
               />
             </span>
           </label>
-          {source && rebatesEnabled && (
-            <RebateEditor
-              key={month}
-              month={month}
-              rebates={source.rebates}
-              dataSource={dataSource ?? getDb()}
-              onSaved={(saved) => {
-                setRaw((current) =>
-                  current
-                    ? {
-                        ...current,
-                        rebates: [
-                          ...current.rebates.filter(
-                            (rebate) => !rebate.month.startsWith(month),
-                          ),
-                          ...saved,
-                        ],
-                      }
-                    : current,
-                );
-              }}
-            />
+          {report && rebatesEnabled && (
+            <details className="mt-4 rounded-[28px] border border-separator bg-card p-4 shadow-[var(--cirrus-shadow-1)]">
+              <summary className="cursor-pointer font-semibold">编辑本月返利</summary>
+              <RebateEditor
+                key={month}
+                month={month}
+                rebates={report.rebates}
+                dataSource={dataSource ?? getDb()}
+                embedded
+                onSaved={async () => {
+                  await shared?.refresh();
+                  await loadDashboard(0, true);
+                }}
+              />
+            </details>
           )}
           <SummarySection
             ariaLabel={`${monthText}统计`}
@@ -171,29 +180,101 @@ export default function ReportsPage({
                   : "本月暂无已结算记录；完成结算后将显示利润。"}
             </p>
           )}
+          {report && report.selectedMonth.salesCount > 0 && (
+            <SalesDetails
+              report={report}
+              lossesOnly={lossesOnly}
+              onLossesOnlyChange={setLossesOnly}
+              loadingMore={loadingMore}
+              onLoadMore={() => void loadDashboard(report.rows.length, false)}
+            />
+          )}
         </>
       )}
       <button
         type="button"
-        disabled={!report}
-        onClick={() => {
-          if (!report) return;
-          const url = URL.createObjectURL(
-            new Blob([buildCsv(report, month, { includeRebates: rebatesEnabled })], {
-              type: "text/csv;charset=utf-8",
-            }),
-          );
-          const anchor = document.createElement("a");
-          anchor.href = url;
-          anchor.download = `报表-${month}.csv`;
-          anchor.click();
-          URL.revokeObjectURL(url);
-        }}
+        disabled={!report || loading || exporting}
+        onClick={() => void exportCsv()}
         className="mt-4 w-full rounded-full border border-separator bg-card py-3.5 font-medium text-tint shadow-[var(--cirrus-shadow-1)] disabled:opacity-40"
       >
-        导出 CSV
+        {exporting ? "正在生成…" : "导出 CSV"}
       </button>
     </>
+  );
+}
+
+function SalesDetails({
+  report,
+  lossesOnly,
+  onLossesOnlyChange,
+  loadingMore,
+  onLoadMore,
+}: {
+  report: ReportDashboardResult;
+  lossesOnly: boolean;
+  onLossesOnlyChange: (value: boolean) => void;
+  loadingMore: boolean;
+  onLoadMore: () => void;
+}) {
+  return (
+    <section aria-label="销售明细" className="mt-4">
+      <div className="mb-2 flex items-center justify-between gap-3">
+        <h2 className="font-semibold">销售明细</h2>
+        <div className="flex rounded-full bg-card p-1 text-sm shadow-[var(--cirrus-shadow-1)]">
+          <button
+            type="button"
+            aria-pressed={!lossesOnly}
+            onClick={() => onLossesOnlyChange(false)}
+            className={`min-h-10 rounded-full px-3 ${!lossesOnly ? "bg-label text-card" : "text-muted"}`}
+          >
+            全部
+          </button>
+          <button
+            type="button"
+            aria-pressed={lossesOnly}
+            onClick={() => onLossesOnlyChange(true)}
+            className={`min-h-10 rounded-full px-3 ${lossesOnly ? "bg-danger text-white" : "text-muted"}`}
+          >
+            仅看亏损
+          </button>
+        </div>
+      </div>
+      {report.rows.length ? (
+        <div className="space-y-2">
+          {report.rows.map((row) => (
+            <article key={row.sale.id} className="rounded-[22px] border border-separator bg-card p-3 shadow-[var(--cirrus-shadow-1)]">
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <h3 className="truncate text-[15px] font-semibold">{row.product.name}</h3>
+                  <p className="mt-0.5 text-sm text-muted">
+                    {row.product.style_code || "无货号"} · {row.unit.size || "待补尺码"}
+                  </p>
+                </div>
+                <p className="shrink-0 font-bold" style={{ color: profitColor(row.profit) }}>
+                  {formatSignedCents(row.profit)}
+                </p>
+              </div>
+              <p className="mt-2 text-sm text-muted">
+                到手 {formatCents(row.sale.actual_payout_cents)} · 成本 {formatCents(row.unit.unit_cost_cents)} · 运费 {formatCents(row.unit.outbound_shipping_cents)}
+              </p>
+              <p className="mt-1 text-xs text-muted">结算日期 {row.sale.settled_at ?? "—"}</p>
+            </article>
+          ))}
+        </div>
+      ) : (
+        <Card><p className="text-sm text-muted">本月没有亏损商品。</p></Card>
+      )}
+      {report.rows.length < report.totalRows && (
+        <button
+          type="button"
+          disabled={loadingMore}
+          onClick={onLoadMore}
+          className="mt-3 min-h-12 w-full rounded-full border border-separator bg-card text-tint"
+        >
+          {loadingMore ? "加载中…" : `加载更多（剩余 ${report.totalRows - report.rows.length} 条）`}
+        </button>
+      )}
+    </section>
   );
 }
 
@@ -202,11 +283,13 @@ function RebateEditor({
   rebates,
   dataSource,
   onSaved,
+  embedded = false,
 }: {
   month: string;
   rebates: MonthlyRebate[];
   dataSource: DbAdapter;
-  onSaved: (rebates: MonthlyRebate[]) => void;
+  onSaved: (rebates: MonthlyRebate[]) => Promise<void> | void;
+  embedded?: boolean;
 }) {
   const amount = (source: RebateSource): number =>
     rebates.find(
@@ -233,7 +316,7 @@ function RebateEditor({
         taobaoAllianceYuan: taobaoAlliance,
         jingfenYuan: jingfen,
       });
-      onSaved(saved);
+      await onSaved(saved);
       setMessage("本月返利已保存并计入利润。");
     } catch (reason: unknown) {
       setSaveError(reason instanceof Error ? reason.message : "返利保存失败");
@@ -242,8 +325,8 @@ function RebateEditor({
     }
   }
 
-  return (
-    <Card className="mt-4">
+  const content = (
+    <>
       <h2 className="font-semibold">本月返利</h2>
       <p className="mt-1 text-sm leading-5 text-muted">
         返利只增加利润，不增加销售额或销量。
@@ -295,8 +378,11 @@ function RebateEditor({
           {busy ? "保存中…" : "保存本月返利"}
         </button>
       </form>
-    </Card>
+    </>
   );
+  return embedded
+    ? <div className="mt-3">{content}</div>
+    : <Card className="mt-4">{content}</Card>;
 }
 
 function SummarySection({

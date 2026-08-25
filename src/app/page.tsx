@@ -6,25 +6,13 @@ import Card from "@/components/ui/Card";
 import PageHeader from "@/components/ui/PageHeader";
 import Stat from "@/components/ui/Stat";
 import { useAppData } from "@/components/AppDataProvider";
-import { supportsRebateIncome } from "@/lib/account-features";
 import { getDb } from "@/lib/data";
-import {
-  buildHomeSummary,
-  type HomeSummary,
-} from "@/lib/home-summary";
+import type { HomeDashboardResult } from "@/lib/data/types";
+import { monthKey } from "@/lib/utils/format";
 import { formatCents } from "@/lib/utils/money";
 
 interface HomeDataSource {
-  getAccountPreferences: ReturnType<typeof getDb>["getAccountPreferences"];
-  listSales: ReturnType<typeof getDb>["listSales"];
-  listUnits: ReturnType<typeof getDb>["listUnits"];
-  listRebates: ReturnType<typeof getDb>["listRebates"];
-  listShippingEvents: ReturnType<typeof getDb>["listShippingEvents"];
-  listShippingEventItems: ReturnType<typeof getDb>["listShippingEventItems"];
-}
-
-interface HomeViewData extends HomeSummary {
-  rebatesEnabled: boolean;
+  getHomeDashboard: ReturnType<typeof getDb>["getHomeDashboard"];
 }
 
 export default function HomePage({
@@ -35,7 +23,7 @@ export default function HomePage({
   now?: Date;
 } = {}) {
   const [referenceNow] = useState(() => now ?? new Date());
-  const [data, setData] = useState<HomeViewData | null>(null);
+  const [data, setData] = useState<HomeDashboardResult | null>(null);
   const [error, setError] = useState("");
   const [attempt, setAttempt] = useState(0);
   const shared = useAppData();
@@ -54,37 +42,10 @@ export default function HomePage({
         if (!dataSource && shared) {
           if (shared.error) throw new Error(shared.error);
           if (!shared.data) return;
-          const snapshot = shared.data;
-          const rebatesEnabled = supportsRebateIncome(snapshot.preferences.workflow);
-          if (active) setData({
-            ...buildHomeSummary(
-              snapshot.units,
-              snapshot.sales,
-              rebatesEnabled ? snapshot.rebates : [],
-              snapshot.shippingEvents,
-              snapshot.shippingEventItems,
-              referenceNow,
-            ),
-            rebatesEnabled,
-          });
-          return;
         }
         const db = dataSource ?? getDb();
-        const preferences = await db.getAccountPreferences();
-        const rebatesEnabled = supportsRebateIncome(preferences.workflow);
-        const [units, sales, rebates, shippingEvents, shippingEventItems] = await Promise.all([
-          db.listUnits(),
-          db.listSales(),
-          rebatesEnabled ? db.listRebates() : Promise.resolve([]),
-          db.listShippingEvents(),
-          db.listShippingEventItems(),
-        ]);
-        if (active) {
-          setData({
-            ...buildHomeSummary(units, sales, rebates, shippingEvents, shippingEventItems, referenceNow),
-            rebatesEnabled,
-          });
-        }
+        const dashboard = await db.getHomeDashboard(monthKey(referenceNow));
+        if (active) setData(dashboard);
       } catch (reason: unknown) {
         if (!active) return;
         setError(reason instanceof Error ? reason.message : "加载失败");
@@ -97,22 +58,7 @@ export default function HomePage({
   }, [attempt, dataSource, referenceNow, shared]);
 
   const monthLabel = `${referenceNow.getMonth() + 1}月`;
-  const displayed = !dataSource && shared?.data
-    ? (() => {
-        const rebatesEnabled = supportsRebateIncome(shared.data.preferences.workflow);
-        return {
-          ...buildHomeSummary(
-            shared.data.units,
-            shared.data.sales,
-            rebatesEnabled ? shared.data.rebates : [],
-            shared.data.shippingEvents,
-            shared.data.shippingEventItems,
-            referenceNow,
-          ),
-          rebatesEnabled,
-        };
-      })()
-    : data;
+  const displayed = data;
 
   return (
     <>

@@ -32,6 +32,8 @@ describe("SaleFormSheet", () => {
     expect(screen.getByText("每件实际到手价（元，必填）")).toBeInTheDocument();
     await userEvent.type(screen.getByLabelText("实际到手价"), "123.45");
     expect(screen.getByText("2 件到账合计 ¥246.90")).toBeInTheDocument();
+    expect(screen.getByText("利润预览（到手－进价－运费）")).toBeInTheDocument();
+    expect(screen.getByText("+¥46.90")).toBeInTheDocument();
     await userEvent.click(
       screen.getByRole("button", { name: "确认到手价并结算" }),
     );

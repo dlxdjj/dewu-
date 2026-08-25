@@ -139,6 +139,10 @@ test("390px add form keeps the purchase date inside the viewport", async ({
   });
 
   await page.goto("/add/");
+  const save = page.getByRole("button", { name: /保存并生成/ });
+  await expect(save).toBeVisible();
+  expect(await save.locator("..").evaluate((node) => getComputedStyle(node).position))
+    .toBe("fixed");
   const date = page.getByLabel("采购日期");
   await expect(date).toBeVisible();
   const bounds = await date.boundingBox();
@@ -266,6 +270,7 @@ test("390px rebate form is readable and saves both sources", async ({
   });
 
   await page.goto("/reports/");
+  await page.getByText("编辑本月返利").click();
   const taobao = page.getByLabel("淘宝联盟返利");
   const jingfen = page.getByLabel("京粉返利");
   await expect(taobao).toBeVisible();
@@ -554,12 +559,15 @@ test("390px inventory supports quick batch settlement and shipping with freight"
   await page
     .getByRole("button", { name: "录入到手价 · 2 件" })
     .click();
+  await expect(page.getByRole("dialog", { name: "批量登记到手价（2 件）" }))
+    .toHaveAttribute("aria-modal", "true");
   const payout = page.getByLabel("实际到手价");
   expect(await payout.evaluate((node) => getComputedStyle(node).fontSize)).toBe(
     "16px",
   );
   await payout.fill("160");
   await expect(page.getByText("2 件到账合计 ¥320.00")).toBeVisible();
+  await expect(page.getByText("+¥120.00")).toBeVisible();
   await page.getByRole("button", { name: "确认到手价并结算" }).click();
   await expect(
     page.getByRole("button", { name: "录入到手价 · 2 件" }),

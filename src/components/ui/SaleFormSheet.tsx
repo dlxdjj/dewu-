@@ -12,9 +12,11 @@ import type { UnitJoined } from "@/lib/types/database";
 import { todayStr } from "@/lib/utils/format";
 import {
   formatCents,
+  formatSignedCents,
   normalizeMoneyInput,
   parseYuanToCents,
 } from "@/lib/utils/money";
+import { actualProfitCents, profitColor } from "@/lib/utils/profit";
 import Sheet from "./Sheet";
 
 type PayoutMode = "same" | "individual";
@@ -69,9 +71,18 @@ export default function SaleFormSheet({
         0,
       );
       if (!Number.isSafeInteger(totalCents)) return null;
+      const profitCents = cents.reduce<number>((sum, value, index) => {
+        if (value == null) return sum;
+        return sum + (actualProfitCents(
+          units[index].unit_cost_cents,
+          units[index].outbound_shipping_cents,
+          value,
+        ) ?? 0);
+      }, 0);
       return {
         entries,
         totalCents,
+        profitCents,
         settledCount: cents.filter((value) => value != null).length,
         pendingCount: cents.filter((value) => value == null).length,
       };
@@ -219,6 +230,14 @@ export default function SaleFormSheet({
             )}
             {preview.pendingCount > 0 && (
               <p className="text-muted">{preview.pendingCount} 件将进入待结算</p>
+            )}
+            {preview.settledCount > 0 && (
+              <div className="mt-1 flex items-center justify-between border-t border-separator pt-1">
+                <span className="text-muted">利润预览（到手－进价－运费）</span>
+                <strong style={{ color: profitColor(preview.profitCents) }}>
+                  {formatSignedCents(preview.profitCents)}
+                </strong>
+              </div>
             )}
           </div>
         )}

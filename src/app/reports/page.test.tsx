@@ -73,6 +73,9 @@ describe("ReportsPage", () => {
     expect(within(monthly).getByText("¥40.00")).toBeInTheDocument();
     expect(within(monthly).getByText("¥120.00")).toBeInTheDocument();
     expect(within(monthly).getByText("1")).toBeInTheDocument();
+    const details = screen.getByRole("region", { name: "销售明细" });
+    expect(within(details).getByText("八月鞋")).toBeInTheDocument();
+    expect(within(details).getByText("+¥40.00")).toBeInTheDocument();
 
     await userEvent.clear(screen.getByLabelText("月份"));
     await userEvent.type(screen.getByLabelText("月份"), "2026-07");
@@ -133,6 +136,7 @@ describe("ReportsPage", () => {
     render(<ReportsPage dataSource={db} initialMonth="2026-08" />);
 
     await screen.findByRole("region", { name: "8月统计" });
+    await userEvent.click(screen.getByText("编辑本月返利"));
     await userEvent.clear(screen.getByLabelText("淘宝联盟返利"));
     await userEvent.type(screen.getByLabelText("淘宝联盟返利"), "10");
     await userEvent.clear(screen.getByLabelText("京粉返利"));
@@ -166,6 +170,34 @@ describe("ReportsPage", () => {
         }),
       ]),
     );
+  });
+
+  it("filters the on-screen sales detail down to losses", async () => {
+    const db = await settledDb();
+    const loss = await db.createPurchase({
+      productName: "亏损鞋",
+      styleCode: "LOSS-1",
+      platform: "jd",
+      unitPriceCents: 10000,
+      quantity: 1,
+      purchasedAt: "2026-08-10",
+      size: "43",
+      initialStatus: "arrived",
+      orderNo: "",
+      note: "",
+    });
+    await db.settleUnits({
+      unitIds: loss.unitIds,
+      actualPayoutCents: 8000,
+      settledAt: "2026-08-11",
+    });
+    render(<ReportsPage dataSource={db} initialMonth="2026-08" />);
+
+    await userEvent.click(await screen.findByRole("button", { name: "仅看亏损" }));
+    const details = await screen.findByRole("region", { name: "销售明细" });
+    expect(within(details).getByText("亏损鞋")).toBeInTheDocument();
+    expect(within(details).getByText("-¥20.00")).toBeInTheDocument();
+    expect(within(details).queryByText("八月鞋")).not.toBeInTheDocument();
   });
 
   it("removes rebate controls and rebate totals for a bulk account", async () => {

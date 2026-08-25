@@ -1,12 +1,21 @@
 import { getSupabase } from "@/lib/supabase/client";
 import type {
   ClearResult,
+  ClientEventSummary,
   DbAdapter,
   DeleteResult,
+  HomeDashboardResult,
   ImportPurchasesResult,
+  InventoryPageResult,
   PurchaseResult,
+  ReportDashboardResult,
   ShipUnitsResult,
 } from "@/lib/data/types";
+import {
+  legacyHomeDashboard,
+  legacyInventoryGroupsPage,
+  legacyReportDashboard,
+} from "@/lib/data/dashboard-fallback";
 import type {
   AccountPreferences,
   Attachment,
@@ -22,6 +31,7 @@ import type {
 } from "@/lib/types/database";
 import { DataAccessError, withDataTimeout } from "@/lib/data/errors";
 import { cachedRead, invalidateDataCache } from "@/lib/data/cache";
+import { monitoredRequest, recordClientEvent } from "@/lib/monitoring";
 
 const BUCKET = "attachments";
 
@@ -38,9 +48,18 @@ function unwrapVoid(error: QueryError): void {
   if (error) throw new DataAccessError(error.message, error.code !== "42501");
 }
 
-async function request<T>(query: PromiseLike<QueryResponse<T>>): Promise<T> {
-  const response = await withDataTimeout(query);
-  return unwrap(response.data, response.error);
+function missingDashboardRpc(error: QueryError): boolean {
+  return ["42883", "PGRST202"].includes(error?.code ?? "");
+}
+
+async function request<T>(
+  query: PromiseLike<QueryResponse<T>>,
+  label = "supabase-read",
+): Promise<T> {
+  return monitoredRequest(label, async () => {
+    const response = await withDataTimeout(query);
+    return unwrap(response.data, response.error);
+  });
 }
 
 async function requestVoid(
@@ -71,7 +90,10 @@ export function createSupabaseAdapter(): DbAdapter {
     name: string,
     params: Record<string, unknown>,
   ): Promise<T> =>
-    request<T>(client.rpc(name, params) as PromiseLike<QueryResponse<T>>);
+    request<T>(
+      client.rpc(name, params) as PromiseLike<QueryResponse<T>>,
+      `rpc:${name}`,
+    );
   const rpcVoid = async (
     name: string,
     params: Record<string, unknown>,
@@ -95,7 +117,7 @@ export function createSupabaseAdapter(): DbAdapter {
     return removal.error ? result : { ...result, pendingStoragePaths: [] };
   }
 
-  return {
+  const adapter: DbAdapter = {
     kind: "supabase",
     listProducts: () => cached("products", () =>
       request<Product[]>(
@@ -146,6 +168,93 @@ export function createSupabaseAdapter(): DbAdapter {
       }
       return unwrap(response.data, response.error);
     }),
+    async getHomeDashboard(month) {
+      const response = await monitoredRequest("rpc:get_home_dashboard", () =>
+        withDataTimeout(
+          client.rpc("get_home_dashboard", { p_month: month }) as PromiseLike<
+            QueryResponse<HomeDashboardResult>
+          >,
+        ),
+      );
+      if (
+        missingDashboardRpc(response.error) ||
+        (!response.error && (!response.data || Array.isArray(response.data)))
+      ) {
+        return legacyHomeDashboard(adapter, month);
+      }
+      if (response.error) {
+        recordClientEvent("error", response.error.message, {
+          metadata: { request: "rpc:get_home_dashboard" },
+        });
+      }
+      return unwrap(response.data, response.error);
+    },
+    async listInventoryGroupsPage(input) {
+      const response = await monitoredRequest("rpc:list_inventory_groups_page", () =>
+        withDataTimeout(
+          client.rpc("list_inventory_groups_page", {
+            p_view: input.view,
+            p_status: input.status,
+            p_platform: input.platform,
+            p_query: input.query,
+            p_missing_size_only: input.missingSizeOnly,
+            p_sort: input.sort,
+            p_limit: input.limit,
+            p_offset: input.offset,
+          }) as PromiseLike<QueryResponse<InventoryPageResult>>,
+        ),
+      );
+      if (
+        missingDashboardRpc(response.error) ||
+        (!response.error && (!response.data || Array.isArray(response.data)))
+      ) {
+        return legacyInventoryGroupsPage(adapter, input);
+      }
+      if (response.error) {
+        recordClientEvent("error", response.error.message, {
+          metadata: { request: "rpc:list_inventory_groups_page" },
+        });
+      }
+      return unwrap(response.data, response.error);
+    },
+    async getReportDashboard(input) {
+      const response = await monitoredRequest("rpc:get_report_dashboard", () =>
+        withDataTimeout(
+          client.rpc("get_report_dashboard", {
+            p_month: input.month,
+            p_limit: input.limit,
+            p_offset: input.offset,
+            p_losses_only: input.lossesOnly,
+          }) as PromiseLike<QueryResponse<ReportDashboardResult>>,
+        ),
+      );
+      if (
+        missingDashboardRpc(response.error) ||
+        (!response.error && (!response.data || Array.isArray(response.data)))
+      ) {
+        return legacyReportDashboard(adapter, input);
+      }
+      if (response.error) {
+        recordClientEvent("error", response.error.message, {
+          metadata: { request: "rpc:get_report_dashboard" },
+        });
+      }
+      return unwrap(response.data, response.error);
+    },
+    async getClientEventSummary() {
+      const response = await withDataTimeout(
+        client.rpc("get_client_event_summary", {}) as PromiseLike<
+          QueryResponse<ClientEventSummary>
+        >,
+      );
+      if (
+        missingDashboardRpc(response.error) ||
+        (!response.error && (!response.data || Array.isArray(response.data)))
+      ) {
+        return { errors: 0, slowRequests: 0, imageErrors: 0, lastEventAt: null };
+      }
+      return unwrap(response.data, response.error);
+    },
     listCatalogProducts: () => cached("catalog-products", () =>
       request<CatalogProduct[]>(
         client
@@ -353,4 +462,5 @@ export function createSupabaseAdapter(): DbAdapter {
       };
     },
   };
+  return adapter;
 }

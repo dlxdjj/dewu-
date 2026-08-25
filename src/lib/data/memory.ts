@@ -1,19 +1,30 @@
 import { PURCHASE_INITIAL_STATUSES } from "@/lib/constants/status";
 import type {
   CleanupResult,
+  ClientEventSummary,
   ClearResult,
   DbAdapter,
   DeleteResult,
   ImportPurchasesInput,
   ImportPurchasesResult,
+  InventoryPageInput,
+  InventoryPageResult,
+  HomeDashboardResult,
   PurchaseInput,
   PurchaseResult,
+  ReportDashboardInput,
+  ReportDashboardResult,
   SaveMonthlyRebatesInput,
   SaveAttachmentInput,
   ShipUnitsInput,
   ShipUnitsResult,
   StatusChangeInput,
 } from "@/lib/data/types";
+import {
+  legacyHomeDashboard,
+  legacyInventoryGroupsPage,
+  legacyReportDashboard,
+} from "@/lib/data/dashboard-fallback";
 import { allocateShippingCents } from "@/lib/services/shipping";
 import type {
   AccountPreferences,
@@ -128,6 +139,26 @@ export class MemoryDbAdapter implements DbAdapter {
 
   async getAccountPreferences() {
     return clone(this.state.preferences);
+  }
+
+  getHomeDashboard(month: string): Promise<HomeDashboardResult> {
+    return legacyHomeDashboard(this, month);
+  }
+
+  listInventoryGroupsPage(
+    input: InventoryPageInput,
+  ): Promise<InventoryPageResult> {
+    return legacyInventoryGroupsPage(this, input);
+  }
+
+  getReportDashboard(
+    input: ReportDashboardInput,
+  ): Promise<ReportDashboardResult> {
+    return legacyReportDashboard(this, input);
+  }
+
+  async getClientEventSummary(): Promise<ClientEventSummary> {
+    return { errors: 0, slowRequests: 0, imageErrors: 0, lastEventAt: null };
   }
 
   async listCatalogProducts() {

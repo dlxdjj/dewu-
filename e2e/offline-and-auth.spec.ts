@@ -11,6 +11,7 @@ test("no-session gate settles on login without an infinite spinner", async ({
   await page.goto("/");
   await expect(page).toHaveURL(/\/login\/?$/);
   await expect(page.getByRole("heading", { name: "登录进销存" })).toBeVisible();
+  await expect(page.getByRole("navigation", { name: "主导航" })).toHaveCount(0);
   await expect(page.getByText("正在连接 Supabase")).not.toBeVisible();
   expect(
     consoleErrors.filter(

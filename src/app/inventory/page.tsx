@@ -1,12 +1,21 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  useCallback,
+  useDeferredValue,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import Card from "@/components/ui/Card";
 import EmptyState from "@/components/ui/EmptyState";
 import GroupCard from "@/components/ui/GroupCard";
 import PageHeader from "@/components/ui/PageHeader";
 import Sheet from "@/components/ui/Sheet";
-import UnitWorkflowSheet, { workflowActionLabel } from "@/components/ui/UnitWorkflowSheet";
+import UnitWorkflowSheet, {
+  workflowActionLabel,
+} from "@/components/ui/UnitWorkflowSheet";
 import { useAppData } from "@/components/AppDataProvider";
 import { loadProductImageUrls } from "@/lib/catalog";
 import { PLATFORM_LABELS, PLATFORMS } from "@/lib/constants/platform";
@@ -16,53 +25,60 @@ import {
   type UnitStatus,
 } from "@/lib/constants/status";
 import { getDb } from "@/lib/data";
-import type { DbAdapter } from "@/lib/data/types";
+import type {
+  DbAdapter,
+  InventoryGroupPageRow,
+  InventoryPageResult,
+  InventorySort,
+  InventoryView,
+} from "@/lib/data/types";
 import type { UnitJoined } from "@/lib/types/database";
-import { actualProfitCents } from "@/lib/utils/profit";
-import {
-  buildGroups,
-  type PlatformFilter,
-  type StatusFilter,
-  type UnitGroup,
-} from "@/lib/utils/group";
+import type { PlatformFilter, StatusFilter } from "@/lib/utils/group";
 
-type InventoryView = "active" | "settlement" | "sales" | "refunds";
-
+const PAGE_SIZE = 20;
+const EMPTY_COUNTS: InventoryPageResult["counts"] = {
+  active: 0,
+  settlement: 0,
+  sales: 0,
+  refunds: 0,
+};
 const VIEWS: { value: InventoryView; label: string; status: UnitStatus | null }[] = [
   { value: "active", label: "当前库存", status: null },
   { value: "settlement", label: "待结算", status: "sold" },
   { value: "sales", label: "销售记录", status: "settled" },
   { value: "refunds", label: "退货退款", status: "refunded" },
 ];
-
-function groupProfitCents(units: UnitJoined[]): number | null {
-  let total = 0;
-  for (const unit of units) {
-    const profit = actualProfitCents(
-      unit.unit_cost_cents,
-      unit.outbound_shipping_cents,
-      unit.sale?.actual_payout_cents ?? null,
-    );
-    if (profit == null) return null;
-    total += profit;
-  }
-  return total;
-}
+const SORTS: { value: InventorySort; label: string; salesOnly?: boolean }[] = [
+  { value: "purchase_desc", label: "采购日期：新到旧" },
+  { value: "purchase_asc", label: "采购日期：旧到新" },
+  { value: "cost_desc", label: "成本：高到低" },
+  { value: "cost_asc", label: "成本：低到高" },
+  { value: "profit_desc", label: "利润：高到低", salesOnly: true },
+  { value: "profit_asc", label: "利润：低到高", salesOnly: true },
+];
 
 export default function InventoryPage({
   dataSource,
 }: {
   dataSource?: DbAdapter;
 } = {}) {
-  const [units, setUnits] = useState<UnitJoined[]>([]);
+  const [groups, setGroups] = useState<InventoryGroupPageRow[]>([]);
+  const [counts, setCounts] = useState(EMPTY_COUNTS);
+  const [totalGroups, setTotalGroups] = useState(0);
+  const [totalUnits, setTotalUnits] = useState(0);
+  const [platforms, setPlatforms] = useState<InventoryPageResult["availablePlatforms"]>([]);
   const [imageUrls, setImageUrls] = useState<Map<string, string>>(new Map());
   const [view, setView] = useState<InventoryView>("active");
   const [platformFilter, setPlatformFilter] = useState<PlatformFilter>("all");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
+  const [sort, setSort] = useState<InventorySort>("purchase_desc");
   const [query, setQuery] = useState("");
+  const deferredQuery = useDeferredValue(query);
   const [missingSizeOnly, setMissingSizeOnly] = useState(false);
   const [filterOpen, setFilterOpen] = useState(false);
+  const [initialized, setInitialized] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [loadError, setLoadError] = useState("");
   const [notice, setNotice] = useState("");
   const [selecting, setSelecting] = useState(false);
@@ -71,41 +87,13 @@ export default function InventoryPage({
   const imageUrlsRef = useRef<Map<string, string>>(new Map());
   const pendingImageIdsRef = useRef(new Set<string>());
   const mountedRef = useRef(true);
+  const requestVersionRef = useRef(0);
   const shared = useAppData();
   const bulk = !dataSource && shared?.data?.preferences.workflow === "bulk";
-
-  const resolveDb = useCallback((): DbAdapter => dataSource ?? getDb(), [dataSource]);
-
-  const load = useCallback(async () => {
-    if (!dataSource && shared && !shared.data) {
-      setLoading(shared.loading);
-      setLoadError(shared.error);
-      return;
-    }
-    setLoading(true);
-    setLoadError("");
-    try {
-      const db = resolveDb();
-      const [raw, products, batches, sales] = !dataSource && shared?.data
-        ? [shared.data.units, shared.data.products, shared.data.batches, shared.data.sales]
-        : await Promise.all([db.listUnits(), db.listProducts(), db.listBatches(), db.listSales()]);
-      const productMap = new Map(products.map((row) => [row.id, row]));
-      const batchMap = new Map(batches.map((row) => [row.id, row]));
-      const saleMap = new Map(sales.map((row) => [row.unit_id, row]));
-      const joined = raw.flatMap((unit): UnitJoined[] => {
-        const product = productMap.get(unit.product_id);
-        const batch = batchMap.get(unit.batch_id);
-        return product && batch
-          ? [{ ...unit, product, batch, sale: saleMap.get(unit.id) ?? null }]
-          : [];
-      });
-      setUnits(joined);
-    } catch (reason) {
-      setLoadError(reason instanceof Error ? reason.message : "加载失败");
-    } finally {
-      setLoading(false);
-    }
-  }, [dataSource, resolveDb, shared]);
+  const resolveDb = useCallback(
+    (): DbAdapter => dataSource ?? getDb(),
+    [dataSource],
+  );
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -118,12 +106,9 @@ export default function InventoryPage({
       if (requestedStatus && ACTIVE_STATUSES.includes(requestedStatus)) {
         setStatusFilter(requestedStatus);
       }
+      setInitialized(true);
     });
   }, []);
-
-  useEffect(() => {
-    void Promise.resolve().then(load);
-  }, [load]);
 
   useEffect(() => {
     mountedRef.current = true;
@@ -132,52 +117,67 @@ export default function InventoryPage({
     };
   }, []);
 
-  const viewCounts = useMemo(() => ({
-    active: units.filter((unit) => ACTIVE_STATUSES.includes(unit.status)).length,
-    settlement: units.filter((unit) => unit.status === "sold").length,
-    sales: units.filter((unit) => unit.status === "settled").length,
-    refunds: units.filter((unit) => unit.status === "refunded").length,
-  }), [units]);
-
-  const visibleUnits = useMemo(() => {
-    const fixedStatus = VIEWS.find((item) => item.value === view)?.status;
-    const needle = query.trim().toLocaleLowerCase();
-    return units.filter((unit) => {
-      const inView = fixedStatus
-        ? unit.status === fixedStatus
-        : ACTIVE_STATUSES.includes(unit.status);
-      if (!inView) return false;
-      if (view === "active" && statusFilter !== "all" && unit.status !== statusFilter) {
-        return false;
+  const loadPage = useCallback(async (
+    offset: number,
+    replace: boolean,
+  ): Promise<void> => {
+    if (!dataSource && shared && !shared.data) {
+      setLoading(shared.loading);
+      setLoadError(shared.error);
+      return;
+    }
+    const version = ++requestVersionRef.current;
+    if (replace) setLoading(true);
+    else setLoadingMore(true);
+    setLoadError("");
+    try {
+      const result = await resolveDb().listInventoryGroupsPage({
+        view,
+        status: statusFilter,
+        platform: bulk ? "all" : platformFilter,
+        query: deferredQuery,
+        missingSizeOnly,
+        sort,
+        limit: PAGE_SIZE,
+        offset,
+      });
+      if (!mountedRef.current || version !== requestVersionRef.current) return;
+      setGroups((current) => replace ? result.groups : [...current, ...result.groups]);
+      setCounts(result.counts);
+      setTotalGroups(result.totalGroups);
+      setTotalUnits(result.totalUnits);
+      setPlatforms(result.availablePlatforms);
+    } catch (reason) {
+      if (version === requestVersionRef.current) {
+        setLoadError(reason instanceof Error ? reason.message : "加载失败");
       }
-      if (!bulk && platformFilter !== "all" && unit.batch.platform !== platformFilter) return false;
-      if (missingSizeOnly && unit.size.trim()) return false;
-      if (!needle) return true;
-      const searchable = [
-        unit.product.name,
-        unit.product.style_code,
-        unit.size,
-        unit.batch.order_no,
-      ];
-      if (!bulk) searchable.push(PLATFORM_LABELS[unit.batch.platform]);
-      return searchable.some((value) => value?.toLocaleLowerCase().includes(needle));
-    });
-  }, [bulk, missingSizeOnly, platformFilter, query, statusFilter, units, view]);
+    } finally {
+      if (version === requestVersionRef.current) {
+        setLoading(false);
+        setLoadingMore(false);
+      }
+    }
+  }, [
+    bulk,
+    dataSource,
+    deferredQuery,
+    missingSizeOnly,
+    platformFilter,
+    resolveDb,
+    shared,
+    sort,
+    statusFilter,
+    view,
+  ]);
 
-  const groups = buildGroups(visibleUnits);
+  useEffect(() => {
+    if (!initialized) return;
+    void Promise.resolve().then(() => loadPage(0, true));
+  }, [initialized, loadPage]);
+
   const visibleProducts = useMemo(
-    () => [
-      ...new Map(
-        visibleUnits.map((unit) => [unit.product.id, unit.product]),
-      ).values(),
-    ],
-    [visibleUnits],
-  );
-  const visibleProductKey = useMemo(
-    () => visibleProducts
-      .map((product) => `${product.id}:${product.updated_at}`)
-      .join("|"),
-    [visibleProducts],
+    () => [...new Map(groups.map((group) => [group.product.id, group.product])).values()],
+    [groups],
   );
 
   useEffect(() => {
@@ -187,30 +187,32 @@ export default function InventoryPage({
         !pendingImageIdsRef.current.has(product.id),
     );
     if (!missing.length) return;
-
     for (const product of missing) pendingImageIdsRef.current.add(product.id);
-    const db = resolveDb();
-    void loadProductImageUrls(db, missing, (productId, url) => {
+    void loadProductImageUrls(resolveDb(), missing, (productId, url) => {
       imageUrlsRef.current.set(productId, url);
       pendingImageIdsRef.current.delete(productId);
-      if (mountedRef.current) {
-        setImageUrls(new Map(imageUrlsRef.current));
-      }
+      if (mountedRef.current) setImageUrls(new Map(imageUrlsRef.current));
     }).finally(() => {
-      for (const product of missing) {
-        pendingImageIdsRef.current.delete(product.id);
-      }
+      for (const product of missing) pendingImageIdsRef.current.delete(product.id);
     });
-  }, [resolveDb, visibleProductKey, visibleProducts]);
-  const availablePlatforms = PLATFORMS.filter((option) =>
-    !bulk && units.some((unit) => unit.batch.platform === option.value),
+  }, [resolveDb, visibleProducts]);
+
+  const availablePlatforms = PLATFORMS.filter(
+    (option) => !bulk && platforms.includes(option.value),
   );
-  const chosen = units.filter((unit) => selected.has(unit.id));
+  const pageUnits = groups.flatMap((group) => group.units);
+  const chosen = pageUnits.filter((unit) => selected.has(unit.id));
   const canBatch = view === "active" || view === "settlement";
+  const hasAnyData = Object.values(counts).some((count) => count > 0);
+  const hasMore = groups.length < totalGroups;
   const activeFilterCount =
     Number(!bulk && platformFilter !== "all") +
     Number(view === "active" && statusFilter !== "all") +
-    Number(missingSizeOnly);
+    Number(missingSizeOnly) +
+    Number(sort !== "purchase_desc");
+  const pageTitle = view === "active"
+    ? "库存"
+    : VIEWS.find((item) => item.value === view)?.label ?? "库存";
 
   function resetSelection(): void {
     setSelecting(false);
@@ -220,10 +222,11 @@ export default function InventoryPage({
   function switchView(next: InventoryView): void {
     setView(next);
     setStatusFilter("all");
+    setSort("purchase_desc");
     resetSelection();
   }
 
-  function toggleGroup(group: UnitGroup): void {
+  function toggleGroup(group: InventoryGroupPageRow): void {
     setSelected((old) => {
       const next = new Set(old);
       const allSelected = group.units.every((unit) => next.has(unit.id));
@@ -239,15 +242,18 @@ export default function InventoryPage({
     setWorkflowUnits(null);
     setNotice(message);
     resetSelection();
-    if (!dataSource && shared) await shared.refresh();
-    else await load();
+    await shared?.refresh();
+    await loadPage(0, true);
   }
 
   return (
     <>
       <div className="flex items-start justify-between gap-3">
-        <PageHeader title="库存" subtitle={loading ? "加载中…" : `${visibleUnits.length} 件 · ${groups.length} 款`} />
-        {canBatch && units.length > 0 && (
+        <PageHeader
+          title={pageTitle}
+          subtitle={loading ? "加载中…" : `${totalUnits} 件 · ${totalGroups} 款`}
+        />
+        {canBatch && counts[view] > 0 && (
           <button
             type="button"
             onClick={() => selecting ? resetSelection() : setSelecting(true)}
@@ -258,18 +264,23 @@ export default function InventoryPage({
         )}
       </div>
 
-      <nav aria-label="库存分类" className="no-scrollbar mb-4 flex gap-1 overflow-x-auto rounded-full border border-separator bg-card p-1 shadow-[var(--cirrus-shadow-1)]">
+      <nav
+        aria-label="库存分类"
+        className="mb-4 grid grid-cols-2 gap-1 rounded-[28px] border border-separator bg-card p-1 shadow-[var(--cirrus-shadow-1)]"
+      >
         {VIEWS.map((item) => (
           <button
             key={item.value}
             type="button"
             aria-pressed={view === item.value}
             onClick={() => switchView(item.value)}
-            className={`min-h-11 shrink-0 rounded-full px-4 text-[15px] transition-colors ${
-              view === item.value ? "bg-label text-card shadow-[var(--cirrus-shadow-2)]" : "text-muted"
+            className={`min-h-11 rounded-full px-3 text-[15px] transition-colors ${
+              view === item.value
+                ? "bg-label text-card shadow-[var(--cirrus-shadow-2)]"
+                : "text-muted"
             }`}
           >
-            {item.label} {viewCounts[item.value]}
+            {item.label} {counts[item.value]}
           </button>
         ))}
       </nav>
@@ -280,7 +291,7 @@ export default function InventoryPage({
         </p>
       )}
 
-      {!loading && units.length > 0 && (
+      {!loading && hasAnyData && (
         <div className="mb-3 flex gap-2">
           <label className="relative min-w-0 flex-1">
             <span className="sr-only">搜索库存</span>
@@ -305,8 +316,7 @@ export default function InventoryPage({
 
       {activeFilterCount > 0 && (
         <div className="mb-3 flex flex-wrap gap-2 text-sm">
-          {platformFilter !== "all" && (
-            !bulk &&
+          {!bulk && platformFilter !== "all" && (
             <button onClick={() => setPlatformFilter("all")} className="rounded-full bg-tint/10 px-3 py-1.5 text-tint">
               {PLATFORM_LABELS[platformFilter]} ×
             </button>
@@ -321,49 +331,64 @@ export default function InventoryPage({
               {STATUS_META[statusFilter].label} ×
             </button>
           )}
+          {sort !== "purchase_desc" && (
+            <button onClick={() => setSort("purchase_desc")} className="rounded-full bg-tint/10 px-3 py-1.5 text-tint">
+              {SORTS.find((item) => item.value === sort)?.label} ×
+            </button>
+          )}
         </div>
       )}
 
       {loadError ? (
         <Card>
           <p role="alert" className="text-sm text-danger">{loadError}</p>
-          <button type="button" onClick={load} className="mt-2 text-sm text-tint">重试</button>
+          <button type="button" onClick={() => void loadPage(0, true)} className="mt-2 text-sm text-tint">重试</button>
         </Card>
       ) : loading ? (
         <InventorySkeleton />
-      ) : units.length === 0 ? (
+      ) : !hasAnyData ? (
         <Card><EmptyState title="暂无商品" subtitle="点底部“添加”录入第一件商品" /></Card>
       ) : groups.length === 0 ? (
         <Card><EmptyState title="没有匹配结果" subtitle="尝试清空搜索或调整筛选条件" /></Card>
       ) : (
-        <div className="grid min-w-0 gap-3 md:grid-cols-2">
-          {groups.map((group, index) => (
-            <GroupCard
-              key={group.key}
-              group={group}
-              imageUrl={imageUrls.get(group.product.id) ?? null}
-              imagePriority={index < 3}
-              profitCents={
-                view === "sales"
-                  ? groupProfitCents(group.units)
-                  : view === "settlement"
-                    ? null
-                    : undefined
-              }
-              platformFilter={platformFilter}
-              selectable={selecting}
-              selected={group.units.every((unit) => selected.has(unit.id))}
-              onToggle={() => toggleGroup(group)}
-              onProcess={view === "refunds" ? undefined : setWorkflowUnits}
-              statusScope={
-                view === "active"
-                  ? statusFilter === "all" ? "active" : statusFilter
-                  : VIEWS.find((item) => item.value === view)?.status
-              }
-              showPlatform={!bulk}
-            />
-          ))}
-        </div>
+        <>
+          <div className="grid min-w-0 gap-3 md:grid-cols-2">
+            {groups.map((group, index) => (
+              <GroupCard
+                key={group.key}
+                group={group}
+                imageUrl={imageUrls.get(group.product.id) ?? null}
+                imagePriority={index < 3}
+                profitCents={
+                  view === "sales" ? group.profitCents
+                    : view === "settlement" ? null
+                      : undefined
+                }
+                platformFilter={platformFilter}
+                selectable={selecting}
+                selected={group.units.every((unit) => selected.has(unit.id))}
+                onToggle={() => toggleGroup(group)}
+                onProcess={view === "refunds" ? undefined : setWorkflowUnits}
+                statusScope={
+                  view === "active"
+                    ? statusFilter === "all" ? "active" : statusFilter
+                    : VIEWS.find((item) => item.value === view)?.status
+                }
+                showPlatform={!bulk}
+              />
+            ))}
+          </div>
+          {hasMore && (
+            <button
+              type="button"
+              disabled={loadingMore}
+              onClick={() => void loadPage(groups.length, false)}
+              className="mt-4 min-h-12 w-full rounded-full border border-separator bg-card font-medium text-tint shadow-[var(--cirrus-shadow-1)] disabled:opacity-50"
+            >
+              {loadingMore ? "加载中…" : `加载更多（剩余 ${totalGroups - groups.length} 款）`}
+            </button>
+          )}
+        </>
       )}
 
       {selecting && (
@@ -385,14 +410,28 @@ export default function InventoryPage({
         </>
       )}
 
-      <Sheet open={filterOpen} title="筛选库存" onClose={() => setFilterOpen(false)}>
+      <Sheet open={filterOpen} title="筛选与排序" onClose={() => setFilterOpen(false)}>
         <div className="space-y-4">
+          <fieldset>
+            <legend className="text-sm text-muted">排序</legend>
+            <div className="mt-2 grid grid-cols-2 gap-2">
+              {SORTS.filter((item) => !item.salesOnly || view === "sales").map((item) => (
+                <FilterButton key={item.value} active={sort === item.value} onClick={() => setSort(item.value)}>
+                  {item.label}
+                </FilterButton>
+              ))}
+            </div>
+          </fieldset>
           {!bulk && (
             <fieldset>
               <legend className="text-sm text-muted">采购平台</legend>
               <div className="mt-2 grid grid-cols-3 gap-2">
                 <FilterButton active={platformFilter === "all"} onClick={() => setPlatformFilter("all")}>全部</FilterButton>
-                {availablePlatforms.map((option) => <FilterButton key={option.value} active={platformFilter === option.value} onClick={() => setPlatformFilter(option.value)}>{option.label}</FilterButton>)}
+                {availablePlatforms.map((option) => (
+                  <FilterButton key={option.value} active={platformFilter === option.value} onClick={() => setPlatformFilter(option.value)}>
+                    {option.label}
+                  </FilterButton>
+                ))}
               </div>
             </fieldset>
           )}
@@ -408,7 +447,11 @@ export default function InventoryPage({
               <legend className="text-sm text-muted">库存状态</legend>
               <div className="mt-2 grid grid-cols-2 gap-2">
                 <FilterButton active={statusFilter === "all"} onClick={() => setStatusFilter("all")}>全部当前库存</FilterButton>
-                {ACTIVE_STATUSES.map((status) => <FilterButton key={status} active={statusFilter === status} onClick={() => setStatusFilter(status)}>{STATUS_META[status].label}</FilterButton>)}
+                {ACTIVE_STATUSES.map((status) => (
+                  <FilterButton key={status} active={statusFilter === status} onClick={() => setStatusFilter(status)}>
+                    {STATUS_META[status].label}
+                  </FilterButton>
+                ))}
               </div>
             </fieldset>
           )}
@@ -428,8 +471,21 @@ export default function InventoryPage({
   );
 }
 
-function FilterButton({ active, onClick, children }: { active: boolean; onClick: () => void; children: React.ReactNode }) {
-  return <button type="button" aria-pressed={active} onClick={onClick} className={`min-h-11 rounded-xl px-2 text-sm ${active ? "bg-label text-card" : "bg-background"}`}>{children}</button>;
+function FilterButton({ active, onClick, children }: {
+  active: boolean;
+  onClick: () => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      aria-pressed={active}
+      onClick={onClick}
+      className={`min-h-11 rounded-xl px-2 text-sm ${active ? "bg-label text-card" : "bg-background"}`}
+    >
+      {children}
+    </button>
+  );
 }
 
 function InventorySkeleton() {
@@ -439,7 +495,11 @@ function InventorySkeleton() {
       {[0, 1, 2, 3].map((item) => (
         <div key={item} aria-hidden="true" className="flex animate-pulse gap-3 rounded-2xl bg-card p-4">
           <div className="h-[72px] w-[72px] shrink-0 rounded-xl bg-separator" />
-          <div className="flex-1 space-y-2 py-1"><div className="h-4 w-3/4 rounded bg-separator" /><div className="h-3 w-1/2 rounded bg-separator" /><div className="h-3 w-2/3 rounded bg-separator" /></div>
+          <div className="flex-1 space-y-2 py-1">
+            <div className="h-4 w-3/4 rounded bg-separator" />
+            <div className="h-3 w-1/2 rounded bg-separator" />
+            <div className="h-3 w-2/3 rounded bg-separator" />
+          </div>
         </div>
       ))}
     </div>

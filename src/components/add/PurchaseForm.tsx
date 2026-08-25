@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { FormEvent, useCallback, useEffect, useState } from "react";
+import { FormEvent, useCallback, useEffect, useRef, useState } from "react";
+import { useAppData } from "@/components/AppDataProvider";
 import Card from "@/components/ui/Card";
 import ImagePicker from "@/components/ui/ImagePicker";
 import PageHeader from "@/components/ui/PageHeader";
@@ -72,11 +73,56 @@ export default function PurchaseForm({
   const [saving, setSaving] = useState(false);
   const [savedProductId, setSavedProductId] = useState<string | null>(null);
   const [error, setError] = useState("");
+  const [draftMessage, setDraftMessage] = useState("");
+  const draftLoadedKeyRef = useRef("");
+  const shared = useAppData();
+  const draftOwner = dataSource
+    ? "memory"
+    : shared?.data?.preferences.user_id ?? "";
+  const draftKey = draftOwner
+    ? `pms_purchase_draft:${draftOwner}:${allowMissingSize ? "bulk" : "standard"}`
+    : "";
 
   const resolveDb = useCallback(
     (): DbAdapter => dataSource ?? getDb(),
     [dataSource],
   );
+
+  useEffect(() => {
+    if (!draftKey) return;
+    queueMicrotask(() => {
+      const storage = purchaseDraftStorage();
+      if (!storage) {
+        draftLoadedKeyRef.current = draftKey;
+        return;
+      }
+      try {
+        const raw = storage.getItem(draftKey);
+        if (raw) {
+          const saved = JSON.parse(raw) as Partial<PurchaseFormState>;
+          setForm((current) => ({ ...current, ...saved }));
+          setDraftMessage("已恢复上次文字草稿，图片需重新选择");
+        }
+      } catch {
+        storage.removeItem(draftKey);
+      } finally {
+        draftLoadedKeyRef.current = draftKey;
+      }
+    });
+  }, [draftKey]);
+
+  useEffect(() => {
+    if (!draftKey) return;
+    const timeoutId = window.setTimeout(() => {
+      if (draftLoadedKeyRef.current !== draftKey) return;
+      try {
+        purchaseDraftStorage()?.setItem(draftKey, JSON.stringify(form));
+      } catch {
+        // A failed draft write must never block purchase entry.
+      }
+    }, 300);
+    return () => window.clearTimeout(timeoutId);
+  }, [draftKey, form]);
 
   useEffect(() => {
     const raw = sessionStorage.getItem("pms_ocr_prefill");
@@ -184,6 +230,8 @@ export default function PurchaseForm({
         unitPriceYuan: form.unitPrice,
         quantity: Number(form.quantity),
       });
+      if (draftKey) purchaseDraftStorage()?.removeItem(draftKey);
+      setDraftMessage("");
       if (!image) {
         onComplete();
         return;
@@ -208,6 +256,7 @@ export default function PurchaseForm({
     setError("");
     try {
       await uploadImage(savedProductId);
+      if (draftKey) purchaseDraftStorage()?.removeItem(draftKey);
       onComplete();
     } catch (reason) {
       setError(
@@ -220,7 +269,7 @@ export default function PurchaseForm({
   }
 
   return (
-    <div className="mx-auto w-full max-w-xl">
+    <div className="mx-auto w-full max-w-xl pb-28">
       {showHeader && (
         <PageHeader
           title="添加"
@@ -231,11 +280,28 @@ export default function PurchaseForm({
       )}
       <Link
         href="/add/ocr"
-        className="mb-4 block rounded-full bg-label py-3.5 text-center text-sm font-medium text-card shadow-[var(--cirrus-shadow-2)]"
+        className="inventory-action-button mb-4 block rounded-full py-3.5 text-center text-sm font-semibold"
       >
         拍照识别订单截图（需人工确认）
       </Link>
-      <form onSubmit={submit}>
+      {draftMessage && (
+        <div role="status" className="mb-3 flex items-center justify-between gap-3 rounded-[20px] bg-card px-4 py-3 text-sm shadow-[var(--cirrus-shadow-1)]">
+          <span className="text-muted">{draftMessage}</span>
+          <button
+            type="button"
+            className="min-h-11 shrink-0 text-tint"
+            onClick={() => {
+              if (draftKey) purchaseDraftStorage()?.removeItem(draftKey);
+              setForm(initialForm());
+              setImage(null);
+              setDraftMessage("");
+            }}
+          >
+            清空草稿
+          </button>
+        </div>
+      )}
+      <form id="purchase-entry-form" onSubmit={submit}>
         <Card className="min-w-0 space-y-4 overflow-hidden">
           <label className="block min-w-0 text-sm">
             品名（必填）
@@ -387,8 +453,10 @@ export default function PurchaseForm({
             {error}
           </p>
         )}
+        <div aria-hidden="true" className="h-24" />
+        <div className="fixed inset-x-3 bottom-[calc(78px+env(safe-area-inset-bottom))] z-40 mx-auto max-w-xl rounded-[24px] border border-separator bg-card/95 p-2.5 shadow-[var(--cirrus-shadow-2)] backdrop-blur-md">
         {savedProductId ? (
-          <div className="mt-4 grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-2 gap-3">
             <button
               type="button"
               disabled={saving}
@@ -409,14 +477,23 @@ export default function PurchaseForm({
           <button
             type="submit"
             disabled={saving}
-            className="mt-4 w-full rounded-full bg-tint py-3.5 font-medium text-white shadow-[var(--cirrus-shadow-2)] disabled:opacity-40"
+            className="w-full rounded-full bg-tint py-3.5 font-medium text-white shadow-[var(--cirrus-shadow-2)] disabled:opacity-40"
           >
             {saving
               ? "保存中…"
               : `保存并生成 ${Number(form.quantity) || 1} 件`}
           </button>
         )}
+        </div>
       </form>
     </div>
   );
+}
+
+function purchaseDraftStorage(): Storage | null {
+  try {
+    return typeof window === "undefined" ? null : window.localStorage ?? null;
+  } catch {
+    return null;
+  }
 }

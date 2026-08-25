@@ -26,7 +26,11 @@ const rebateGuardMigrationPath = path.resolve(
   __dirname,
   "../../supabase/migrations/0008_bulk_rebate_guard.sql",
 );
-const migration = [secureMigrationPath, integrityMigrationPath, rebateMigrationPath, shippingMigrationPath, importMigrationPath, rebateGuardMigrationPath]
+const dashboardMigrationPath = path.resolve(
+  __dirname,
+  "../../supabase/migrations/0009_paged_dashboards.sql",
+);
+const migration = [secureMigrationPath, integrityMigrationPath, rebateMigrationPath, shippingMigrationPath, importMigrationPath, rebateGuardMigrationPath, dashboardMigrationPath]
   .map((migrationPath) => fs.readFileSync(migrationPath, "utf8"))
   .join("\n");
 
@@ -121,5 +125,23 @@ describe("secure migration RPC contracts", () => {
     expect(body).toMatch(/update inventory_units[^]*set size = v_size/i);
     expect(body).not.toMatch(/insert into inventory_units/i);
     expect(body).not.toMatch(/delete from inventory_units/i);
+  });
+
+  it("keeps paged dashboards owned and bounded", () => {
+    const inventory = functionBody("list_inventory_groups_page");
+    const home = functionBody("get_home_dashboard");
+    const report = functionBody("get_report_dashboard");
+    expect(inventory).toMatch(/v_uid uuid := require_uid\(\)/i);
+    expect(inventory).toMatch(/least\(greatest\(coalesce\(p_limit, 30\), 1\), 100\)/i);
+    expect(home).toMatch(/where user_id = v_uid/i);
+    expect(report).toMatch(/s\.actual_payout_cents - u\.unit_cost_cents - u\.outbound_shipping_cents/i);
+  });
+
+  it("stores only owned authenticated client monitoring events", () => {
+    const sql = fs.readFileSync(dashboardMigrationPath, "utf8");
+    expect(sql).toMatch(/alter table client_events enable row level security/i);
+    expect(sql).toMatch(/for insert to authenticated with check \(user_id = auth\.uid\(\)\)/i);
+    expect(sql).toMatch(/for select to authenticated using \(user_id = auth\.uid\(\)\)/i);
+    expect(sql).toMatch(/revoke all on client_events from anon, authenticated/i);
   });
 });

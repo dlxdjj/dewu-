@@ -1,6 +1,6 @@
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { MemoryDbAdapter } from "@/lib/data/memory";
 import PurchaseForm from "./PurchaseForm";
 
@@ -24,6 +24,22 @@ vi.mock("@/components/ui/ImagePicker", () => ({
 }));
 
 const timestamp = "2026-08-01T00:00:00Z";
+let draftValues = new Map<string, string>();
+
+beforeEach(() => {
+  draftValues = new Map();
+  Object.defineProperty(window, "localStorage", {
+    configurable: true,
+    value: {
+      getItem: (key: string) => draftValues.get(key) ?? null,
+      setItem: (key: string, value: string) => draftValues.set(key, value),
+      removeItem: (key: string) => draftValues.delete(key),
+      clear: () => draftValues.clear(),
+      key: () => null,
+      length: 0,
+    },
+  });
+});
 
 async function fillRequiredFields(styleCode = "STYLE-001"): Promise<void> {
   const user = userEvent.setup();
@@ -213,5 +229,23 @@ describe("PurchaseForm", () => {
       "src",
       "memory://owner/product/hp-5969",
     );
+  });
+
+  it("restores an account-scoped draft and can clear it", async () => {
+    const db = new MemoryDbAdapter();
+    const first = render(<PurchaseForm dataSource={db} onComplete={vi.fn()} />);
+    await userEvent.type(screen.getByLabelText("品名（必填）"), "未完成的鞋");
+    await waitFor(() =>
+      expect(draftValues.get("pms_purchase_draft:memory:standard"))
+        .toContain("未完成的鞋"),
+    );
+    first.unmount();
+
+    render(<PurchaseForm dataSource={db} onComplete={vi.fn()} />);
+    expect(await screen.findByText("已恢复上次文字草稿，图片需重新选择")).toBeInTheDocument();
+    expect(screen.getByLabelText("品名（必填）")).toHaveValue("未完成的鞋");
+    await userEvent.click(screen.getByRole("button", { name: "清空草稿" }));
+    expect(screen.getByLabelText("品名（必填）")).toHaveValue("");
+    expect(draftValues.has("pms_purchase_draft:memory:standard")).toBe(false);
   });
 });
