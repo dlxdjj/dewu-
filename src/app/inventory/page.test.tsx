@@ -154,6 +154,36 @@ describe("InventoryPage", () => {
     ]);
   });
 
+  it("shows the corresponding realized profit on each sales-record group", async () => {
+    const db = new MemoryDbAdapter();
+    const purchase = await db.createPurchase({
+      productName: "利润鞋",
+      styleCode: "PROFIT-2",
+      platform: "taobao",
+      unitPriceCents: 10000,
+      quantity: 2,
+      purchasedAt: "2026-08-20",
+      size: "42",
+      initialStatus: "arrived",
+      orderNo: "",
+      note: "",
+    });
+    await db.changeStatus({ unitIds: purchase.unitIds, toStatus: "sold" });
+    await db.settleUnits({
+      unitIds: purchase.unitIds,
+      actualPayoutCents: 15000,
+      settledAt: "2026-08-21",
+    });
+    render(<InventoryPage dataSource={db} />);
+
+    await userEvent.click(
+      await screen.findByRole("button", { name: "销售记录 2" }),
+    );
+
+    expect(await screen.findByText("利润合计")).toBeInTheDocument();
+    expect(screen.getByText("+¥100.00")).toHaveStyle({ color: "#1B7F37" });
+  });
+
   it("keeps refunded goods out of current inventory and in refund history", async () => {
     const seed = makeInventorySeed();
     seed.units![0].status = "refunded";
@@ -171,6 +201,8 @@ describe("InventoryPage", () => {
     render(<InventoryPage dataSource={new MemoryDbAdapter(seed)} />);
     await userEvent.click(await screen.findByRole("button", { name: "待结算 1" }));
     await screen.findByText("数量 1");
+    expect(screen.getByText("利润合计")).toBeInTheDocument();
+    expect(screen.getByText("未结算")).toBeInTheDocument();
     await userEvent.click(screen.getByRole("button", { name: "批量操作" }));
     await userEvent.click(
       screen.getByRole("button", { name: "选择 AB-1 42，共 1 件" }),

@@ -17,7 +17,8 @@ import { getDb } from "@/lib/data";
 import type { DbAdapter } from "@/lib/data/types";
 import type { UnitJoined } from "@/lib/types/database";
 import { type GroupSelection, matchesGroup } from "@/lib/utils/group";
-import { formatCents } from "@/lib/utils/money";
+import { formatCents, formatSignedCents } from "@/lib/utils/money";
+import { profitColor, unitProfit } from "@/lib/utils/profit";
 
 interface InventoryGroupPageProps {
   dataSource?: DbAdapter;
@@ -142,6 +143,11 @@ function GroupContent({
   );
   const awaitingSettlement = units.filter((unit) => unit.status === "sold");
   const missingSizeUnits = units.filter((unit) => !unit.size.trim());
+  const realizedProfits = units.flatMap((unit) => {
+    const value = unitProfit(unit, unit.sale).value;
+    return value == null ? [] : [value];
+  });
+  const totalProfit = realizedProfits.reduce((sum, value) => sum + value, 0);
 
   async function workflowDone(message: string): Promise<void> {
     setWorkflowUnits(null);
@@ -166,6 +172,17 @@ function GroupContent({
         <p className="mt-1 text-sm text-muted">
           采购成本合计 {loading ? "…" : formatCents(totalCost)}
         </p>
+        {realizedProfits.length > 0 && (
+          <p className="mt-2 flex items-center justify-between rounded-full bg-background px-3 py-2 text-sm">
+            <span className="text-muted">实际利润合计</span>
+            <span
+              className="font-bold"
+              style={{ color: profitColor(totalProfit) }}
+            >
+              {formatSignedCents(totalProfit)}
+            </span>
+          </p>
+        )}
         {awaitingSettlement.length > 0 && (
           <button
             type="button"
@@ -191,7 +208,9 @@ function GroupContent({
         </p>
       )}
       <div className="mt-3 space-y-2">
-        {units.map((unit, index) => (
+        {units.map((unit, index) => {
+          const profit = unitProfit(unit, unit.sale).value;
+          return (
           <div key={unit.id} className="rounded-xl bg-card p-3">
             <p className="text-[15px] leading-6">
               第 {index + 1} 件{showPlatform ? ` · ${PLATFORM_LABELS[unit.batch.platform]}` : ""} · 进价{" "}
@@ -203,6 +222,14 @@ function GroupContent({
               {unit.sale?.actual_payout_cents != null &&
                 ` · 到手 ${formatCents(unit.sale.actual_payout_cents)}`}
             </p>
+            {profit != null && (
+              <p className="mt-1 text-sm font-semibold">
+                实际利润{" "}
+                <span style={{ color: profitColor(profit) }}>
+                  {formatSignedCents(profit)}
+                </span>
+              </p>
+            )}
             <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-2">
               {NEXT_ACTION_LABEL[unit.status] && (
                 <button
@@ -221,7 +248,8 @@ function GroupContent({
               </Link>
             </div>
           </div>
-        ))}
+          );
+        })}
       </div>
       {error && (
         <p role="alert" className="mt-3 text-sm text-danger">

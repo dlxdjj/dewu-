@@ -104,6 +104,9 @@ describe("InventoryGroupPage", () => {
         .toBe(true),
     );
     expect(await screen.findAllByText("修改到手价")).toHaveLength(2);
+    expect(screen.getByText("实际利润合计")).toBeInTheDocument();
+    expect(screen.getByText("+¥80.00")).toBeInTheDocument();
+    expect(screen.getAllByText("+¥40.00")).toHaveLength(2);
   });
 
   it("fills a missing size for every imported unit without recreating stock", async () => {

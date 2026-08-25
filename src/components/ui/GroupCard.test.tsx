@@ -86,6 +86,35 @@ describe("GroupCard", () => {
     );
   });
 
+  it("shows a realized group profit only when it is provided", () => {
+    const { rerender } = render(
+      <GroupCard
+        group={group}
+        imageUrl={null}
+        profitCents={4666}
+        platformFilter="all"
+        selectable={false}
+        selected={false}
+        onToggle={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByText("利润合计")).toBeInTheDocument();
+    expect(screen.getByText("+¥46.66")).toHaveStyle({ color: "#1B7F37" });
+
+    rerender(
+      <GroupCard
+        group={group}
+        imageUrl={null}
+        platformFilter="all"
+        selectable={false}
+        selected={false}
+        onToggle={vi.fn()}
+      />,
+    );
+    expect(screen.queryByText("利润合计")).not.toBeInTheDocument();
+  });
+
   it("selects the whole group instead of navigating in batch mode", async () => {
     const onToggle = vi.fn();
     render(

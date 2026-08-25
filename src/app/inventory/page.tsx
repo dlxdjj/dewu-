@@ -18,6 +18,7 @@ import {
 import { getDb } from "@/lib/data";
 import type { DbAdapter } from "@/lib/data/types";
 import type { UnitJoined } from "@/lib/types/database";
+import { actualProfitCents } from "@/lib/utils/profit";
 import {
   buildGroups,
   type PlatformFilter,
@@ -33,6 +34,20 @@ const VIEWS: { value: InventoryView; label: string; status: UnitStatus | null }[
   { value: "sales", label: "销售记录", status: "settled" },
   { value: "refunds", label: "退货退款", status: "refunded" },
 ];
+
+function groupProfitCents(units: UnitJoined[]): number | null {
+  let total = 0;
+  for (const unit of units) {
+    const profit = actualProfitCents(
+      unit.unit_cost_cents,
+      unit.outbound_shipping_cents,
+      unit.sale?.actual_payout_cents ?? null,
+    );
+    if (profit == null) return null;
+    total += profit;
+  }
+  return total;
+}
 
 export default function InventoryPage({
   dataSource,
@@ -328,6 +343,13 @@ export default function InventoryPage({
               group={group}
               imageUrl={imageUrls.get(group.product.id) ?? null}
               imagePriority={index < 3}
+              profitCents={
+                view === "sales"
+                  ? groupProfitCents(group.units)
+                  : view === "settlement"
+                    ? null
+                    : undefined
+              }
               platformFilter={platformFilter}
               selectable={selecting}
               selected={group.units.every((unit) => selected.has(unit.id))}

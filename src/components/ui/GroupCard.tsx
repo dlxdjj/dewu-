@@ -3,7 +3,8 @@
 import Link from "next/link";
 import { PLATFORM_LABELS } from "@/lib/constants/platform";
 import { STATUS_META, UNIT_STATUSES } from "@/lib/constants/status";
-import { formatCents } from "@/lib/utils/money";
+import { formatCents, formatSignedCents } from "@/lib/utils/money";
+import { profitColor } from "@/lib/utils/profit";
 import { rememberDisplayedProductImage } from "@/lib/product-image-cache";
 import {
   groupQuery,
@@ -18,6 +19,7 @@ export default function GroupCard({
   group,
   imageUrl,
   imagePriority = false,
+  profitCents,
   platformFilter,
   selectable,
   selected,
@@ -29,6 +31,7 @@ export default function GroupCard({
   group: UnitGroup;
   imageUrl: string | null;
   imagePriority?: boolean;
+  profitCents?: number | null;
   platformFilter: PlatformFilter;
   selectable: boolean;
   selected: boolean;
@@ -111,6 +114,17 @@ export default function GroupCard({
             成本合计 {formatCents(group.totalCostCents)}
           </p>
         </div>
+        {profitCents !== undefined && (
+          <div className="mt-2 flex items-center justify-between rounded-full bg-background px-3 py-1.5 text-sm">
+            <span className="text-muted">利润合计</span>
+            <span
+              className="font-bold"
+              style={{ color: profitColor(profitCents) }}
+            >
+              {formatSignedCents(profitCents)}
+            </span>
+          </div>
+        )}
       </div>
     </>
   );
